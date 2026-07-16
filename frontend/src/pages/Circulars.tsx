@@ -4,7 +4,6 @@ import { extractTextFromPDF } from "../services/pdfService";
 import { generateICS } from "../services/icsGenerator";
 import VisualCalendar from "../components/VisualCalendar";
 
-// Definiamo il tipo per una circolare salvata nel DB
 interface SavedCircular {
   id: string;
   fileName: string;
@@ -18,20 +17,18 @@ interface SavedCircular {
 }
 
 export default function Circulars() {
-  // Usiamo i nomi corretti esportati dal hook
-  const { circulars, loading, error, refetch } = useCirculars();
+  // RIMOSSO 'refetch' perché non veniva usato
+  const { circulars, loading, error } = useCirculars();
   
   const [savedCirculars, setSavedCirculars] = useState<SavedCircular[]>([]);
   const [selectedCircular, setSelectedCircular] = useState<SavedCircular | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [processError, setProcessError] = useState<string | null>(null);
 
-  // Carica l'archivio delle circolari all'avvio
   useEffect(() => {
     fetchSavedCirculars();
   }, []);
 
-  // Quando il hook aggiorna le circolari, aggiorniamo anche il nostro stato locale
   useEffect(() => {
     if (circulars && circulars.length > 0) {
       setSavedCirculars(circulars as unknown as SavedCircular[]);
@@ -58,7 +55,6 @@ export default function Circulars() {
     setProcessError(null);
 
     try {
-      // 1. Estraiamo il testo dal PDF (se fallisce, passiamo stringa vuota)
       let text = "";
       try {
         text = await extractTextFromPDF(file);
@@ -66,13 +62,8 @@ export default function Circulars() {
         console.warn("Impossibile estrarre testo dal PDF, invio solo il file:", e);
       }
 
-      // 2. Inviamo il file al backend per l'analisi
       await analyzeCircular(file, text);
-      
-      // 3. Ricarichiamo l'archivio per mostrare la nuova circolare
       await fetchSavedCirculars();
-      
-      // 4. Resetta l'input file
       event.target.value = "";
     } catch (err: any) {
       setProcessError(err.message || "Errore durante l'elaborazione del file.");
@@ -113,7 +104,6 @@ export default function Circulars() {
         <h1 className="text-2xl font-bold text-gray-900">Gestione Circolari</h1>
       </div>
 
-      {/* Sezione Upload */}
       <div className="bg-white shadow-sm border border-gray-200 rounded-lg p-6">
         <h2 className="text-lg font-semibold mb-4 text-gray-800">Carica Nuova Circolare</h2>
         <label className="block">
@@ -123,12 +113,7 @@ export default function Circulars() {
             accept=".pdf"
             onChange={handleFileChange}
             disabled={isProcessing || loading}
-            className="block w-full text-sm text-gray-500
-              file:mr-4 file:py-2 file:px-4
-              file:rounded-full file:border-0
-              file:text-sm file:font-semibold
-              file:bg-blue-50 file:text-blue-700
-              hover:file:bg-blue-100 cursor-pointer disabled:opacity-50"
+            className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer disabled:opacity-50"
           />
         </label>
       </div>
@@ -147,7 +132,6 @@ export default function Circulars() {
         </div>
       )}
 
-      {/* ARCHIVIO CIRCOLARI SALVATE */}
       <div className="bg-white shadow-sm border border-gray-200 rounded-lg p-6">
         <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
           <span>🗄️</span> Archivio Circolari ({savedCirculars.length})
@@ -174,29 +158,17 @@ export default function Circulars() {
                     <p className="text-xs text-gray-400 mt-2">{circ.events?.length || 0} eventi estratti • Caricata il {new Date(circ.createdAt).toLocaleDateString('it-IT')}</p>
                   </div>
                   <div className="flex gap-2" onClick={(e) => e.stopPropagation()}>
-                    <button
-                      onClick={() => handleDownloadPDF(circ)}
-                      className="text-xs bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 px-3 py-1.5 rounded-md transition-colors"
-                    >
-                      📄 PDF
-                    </button>
-                    <button
-                      onClick={() => handleDownloadICS(circ)}
-                      className="text-xs bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-md transition-colors"
-                    >
-                      📥 .ics
-                    </button>
+                    <button onClick={() => handleDownloadPDF(circ)} className="text-xs bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 px-3 py-1.5 rounded-md transition-colors">📄 PDF</button>
+                    <button onClick={() => handleDownloadICS(circ)} className="text-xs bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-md transition-colors">📥 .ics</button>
                   </div>
                 </div>
 
-                {/* Dettagli espandibili */}
                 {selectedCircular?.id === circ.id && (
                   <div className="mt-4 pt-4 border-t border-blue-200 animate-in fade-in slide-in-from-top-2">
                     <h4 className="text-sm font-semibold text-blue-900 mb-2">Ordine del Giorno</h4>
                     <p className="text-sm text-gray-700 whitespace-pre-wrap bg-white p-3 rounded border border-blue-100 mb-4">
                       {circ.summary || "Nessun riassunto."}
                     </p>
-                    
                     {circ.events && circ.events.length > 0 && (
                       <>
                         <h4 className="text-sm font-semibold text-blue-900 mb-2">Eventi ({circ.events.length})</h4>

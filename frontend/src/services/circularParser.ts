@@ -1,4 +1,4 @@
-import { Circular } from '../types/Circular';
+import type { Circular } from '../types/Circular';
 
 export function parseCircularData(text: string, fileName: string): Partial<Circular> {
   const lines = text.split('\n').filter(line => line.trim() !== '');
