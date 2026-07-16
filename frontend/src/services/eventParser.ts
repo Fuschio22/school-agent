@@ -1,52 +1,18 @@
 import type { SchoolEvent } from "../types/SchoolEvent";
 
-export function parseEvents(text: string): SchoolEvent[] {
-  const events: SchoolEvent[] = [];
+const VALID_TYPES = ["CDC", "COLLEGIO", "GLO", "GLI", "DIPARTIMENTO", "SCRUTINIO", "FORMAZIONE", "ALTRO"];
 
-  const lines = text.split("\n");
-
-  let currentDate = "";
-
-  const dateRegex =
-    /\b\d{2}\/\d{2}\/\d{4}\b/;
-
-  const eventRegex =
-    /(\d{2}:\d{2})\s*[–-]\s*(\d{2}:\d{2})\s+(.+)/;
-
-  for (const rawLine of lines) {
-    const line = rawLine.trim();
-
-    if (!line) continue;
-
-    const dateMatch = line.match(dateRegex);
-
-    if (dateMatch) {
-      currentDate = dateMatch[0];
-      continue;
-    }
-
-    const eventMatch = line.match(eventRegex);
-
-    if (!eventMatch) continue;
-
-    const [, start, end, title] = eventMatch;
-
-    events.push({
-      id: crypto.randomUUID(),
-
-      title,
-
-      type: "CDC",
-
-      date: currentDate,
-
-      startTime: start,
-
-      endTime: end,
-
-      circularNumber: "",
-    });
-  }
-
-  return events;
+export function normalizeEventData(events: any[]): Partial<SchoolEvent>[] {
+  if (!Array.isArray(events)) return [];
+  
+  return events.map((event, index) => ({
+    id: event.id || `event-${index}`,
+    title: String(event.title || "").trim(),
+    type: VALID_TYPES.includes(event.type) ? event.type : "ALTRO",
+    date: String(event.date || "").trim(),
+    startTime: String(event.startTime || "").trim(),
+    endTime: String(event.endTime || "").trim(),
+    location: event.location ? String(event.location).trim() : undefined,
+    circularNumber: event.circularNumber ? String(event.circularNumber).trim() : undefined,
+  }));
 }

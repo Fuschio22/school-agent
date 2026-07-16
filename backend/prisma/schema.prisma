@@ -1,0 +1,51 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String     @id @default(uuid())
+  email         String     @unique
+  name          String?
+  circulars     Circular[]
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+}
+
+model Circular {
+  id          String     @id @default(uuid())
+  fileName    String
+  filePath    String?
+  number      String
+  date        String
+  subject     String
+  summary     String
+  priority    String
+  recipients  String
+  deadlines   String
+  text        String
+  events      Event[]
+  userId      String
+  user        User       @relation(fields: [userId], references: [id])
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+}
+
+model Event {
+  id             String    @id @default(uuid())
+  title          String
+  type           String
+  date           String
+  startTime      String
+  endTime        String
+  location       String?
+  circularNumber String?
+  circularId     String
+  circular       Circular  @relation(fields: [circularId], references: [id], onDelete: Cascade)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+}
