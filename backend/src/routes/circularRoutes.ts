@@ -2,11 +2,10 @@ import { Router } from "express";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
-import { analyzeCircularController } from "../controllers/circularController";
+import { analyzeCircularController, getAllCircularsController } from "../controllers/circularController";
 
 const router = Router();
 
-// Configurazione cartella uploads
 const uploadDir = path.join(__dirname, "../../uploads");
 if (!fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir, { recursive: true });
@@ -28,7 +27,9 @@ const upload = multer({
   }
 });
 
-// La rotta ora accetta un file chiamato 'pdf'
+// QUESTA RIGA È FONDAMENTALE:
+router.get("/", getAllCircularsController);
+
 router.post("/analyze", upload.single('pdf'), analyzeCircularController);
 
 export default router;

@@ -1,31 +1,33 @@
 {
   "name": "school-agent-backend",
   "version": "1.0.0",
-  "description": "Backend per SchoolAgent - Analisi Circolari AI",
-  "main": "src/index.ts",
+  "description": "Backend per SchoolAgent - Assistente AI per docenti",
+  "main": "dist/index.js",
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "build": "tsc",
-    "start": "node dist/index.js"
+    "start": "node dist/index.js",
+    "postinstall": "prisma generate"
   },
-  "keywords": [],
+  "keywords": ["school", "ai", "education"],
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "@prisma/client": "^6.0.0",
+    "express": "^4.18.2",
     "cors": "^2.8.5",
-    "dotenv": "^16.4.5",
-    "express": "^4.19.2",
-    "multer": "^2.2.0",
-    "openai": "^4.52.0"
+    "dotenv": "^16.3.1",
+    "@prisma/client": "^5.7.1",
+    "openai": "^4.20.1",
+    "multer": "^1.4.5-lts.1",
+    "pg": "^8.11.3"
   },
   "devDependencies": {
-    "@types/cors": "^2.8.17",
     "@types/express": "^4.17.21",
-    "@types/multer": "^2.2.0",
-    "@types/node": "^20.14.0",
-    "prisma": "^6.0.0",
-    "tsx": "^4.15.0",
-    "typescript": "^5.5.0"
+    "@types/cors": "^2.8.17",
+    "@types/multer": "^1.4.11",
+    "@types/node": "^20.10.5",
+    "prisma": "^5.7.1",
+    "tsx": "^4.6.2",
+    "typescript": "^5.3.3"
   }
 }

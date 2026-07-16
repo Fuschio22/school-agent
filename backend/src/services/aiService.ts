@@ -17,32 +17,28 @@ export async function analyzeCircularText(text: string) {
         STRUTTURA JSON OBBLIGATORIA:
         {
           "circolare": {
-            "numero": "string (es. '102')",
-            "data": "string (es. '31 ottobre 2025')",
+            "numero": "string",
+            "data": "string",
             "oggetto": "string",
             "destinatari": ["array di stringhe"]
           },
           "eventi": [
             {
-              "sede": "Nome completo della sede (es. 'ISTITUTO PROFESSIONALE... Sede La Caletta')",
+              "sede": "string",
               "data": "DD/MM/YYYY",
-              "oraInizio": "HH:MM (normalizza i punti in due punti, es. 17.00 -> 17:00)",
+              "oraInizio": "HH:MM",
               "oraFine": "HH:MM",
-              "classe": "Nome esatto della classe (es. '1^ A IPSASR')"
+              "classe": "string"
             }
           ],
-          "ordineDelGiorno": [
-            "1. insediamento della componente studenti e genitori",
-            "2. andamento didattico disciplinare"
-          ]
+          "ordineDelGiorno": ["array di stringhe"]
         }
 
         REGOLE FONDAMENTALI:
-        1. Crea UN evento per OGNI riga delle tabelle nel testo (es. 15:00-16:00 1^A è un evento).
+        1. Crea UN evento per OGNI riga delle tabelle nel testo.
         2. Normalizza gli orari: se trovi '17.00', convertilo in '17:00'.
-        3. Copia l'ordine del giorno ESATTAMENTE come nel testo, dividendolo in un array di stringhe in ORDINE CRESCENTE (da 1 a 8).
-        4. Non omettere nessuna classe.
-        5. Restituisci SOLO il JSON, senza markdown o testo aggiuntivo.`
+        3. Copia l'ordine del giorno ESATTAMENTE come nel testo, dividendolo in un array di stringhe.
+        4. Restituisci SOLO il JSON, senza markdown o testo aggiuntivo.`
       },
       {
         role: "user",
@@ -52,5 +48,7 @@ export async function analyzeCircularText(text: string) {
     response_format: { type: "json_object" }
   });
 
-  return JSON.parse(response.choices[0].message.content || "{}");
+  // Controllo di sicurezza per evitare l'errore "possibly undefined"
+  const content = response.choices[0]?.message?.content || "{}";
+  return JSON.parse(content);
 }
