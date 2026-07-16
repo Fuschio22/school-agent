@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
-import { useCircular } from "../hooks/useCircular";
+import { useCirculars, analyzeCircular } from "../hooks/useCircular";
+import { extractTextFromPDF } from "../services/pdfService";
 import { generateICS } from "../services/icsGenerator";
 import VisualCalendar from "../components/VisualCalendar";
 
@@ -17,26 +18,29 @@ interface SavedCircular {
 }
 
 export default function Circulars() {
-  const { loading, circular, error, processPDF } = useCircular();
+  // Usiamo i nomi corretti esportati dal hook
+  const { circulars, loading, error, refetch } = useCirculars();
+  
   const [savedCirculars, setSavedCirculars] = useState<SavedCircular[]>([]);
   const [selectedCircular, setSelectedCircular] = useState<SavedCircular | null>(null);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [processError, setProcessError] = useState<string | null>(null);
 
-  // Carica l'archivio delle circolari all'avvio della pagina
+  // Carica l'archivio delle circolari all'avvio
   useEffect(() => {
     fetchSavedCirculars();
   }, []);
 
-  // Se ho appena caricato una circolare con successo, ricarico l'archivio
+  // Quando il hook aggiorna le circolari, aggiorniamo anche il nostro stato locale
   useEffect(() => {
-    if (circular && !loading) {
-      fetchSavedCirculars();
-      setSelectedCircular(circular as unknown as SavedCircular);
+    if (circulars && circulars.length > 0) {
+      setSavedCirculars(circulars as unknown as SavedCircular[]);
     }
-  }, [circular, loading]);
+  }, [circulars]);
 
   const fetchSavedCirculars = async () => {
     try {
-      const response = await fetch("https://psychic-capybara-wv6qwv4x5vr25pqq-3000.app.github.dev/api/circulars");
+      const response = await fetch("https://school-agent-backend.onrender.com/api/circulars");
       if (response.ok) {
         const data = await response.json();
         setSavedCirculars(data);
@@ -46,10 +50,34 @@ export default function Circulars() {
     }
   };
 
-  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-    if (file) {
-      processPDF(file);
+    if (!file) return;
+
+    setIsProcessing(true);
+    setProcessError(null);
+
+    try {
+      // 1. Estraiamo il testo dal PDF (se fallisce, passiamo stringa vuota)
+      let text = "";
+      try {
+        text = await extractTextFromPDF(file);
+      } catch (e) {
+        console.warn("Impossibile estrarre testo dal PDF, invio solo il file:", e);
+      }
+
+      // 2. Inviamo il file al backend per l'analisi
+      await analyzeCircular(file, text);
+      
+      // 3. Ricarichiamo l'archivio per mostrare la nuova circolare
+      await fetchSavedCirculars();
+      
+      // 4. Resetta l'input file
+      event.target.value = "";
+    } catch (err: any) {
+      setProcessError(err.message || "Errore durante l'elaborazione del file.");
+    } finally {
+      setIsProcessing(false);
     }
   };
 
@@ -69,7 +97,7 @@ export default function Circulars() {
   const handleDownloadPDF = (circ: SavedCircular) => {
     if (!circ.filePath) return;
     const fileName = circ.filePath.split('/').pop();
-    const backendUrl = "https://psychic-capybara-wv6qwv4x5vr25pqq-3000.app.github.dev";
+    const backendUrl = "https://school-agent-backend.onrender.com";
     const link = document.createElement('a');
     link.href = `${backendUrl}/uploads/${fileName}`;
     link.setAttribute('download', circ.fileName);
@@ -94,24 +122,25 @@ export default function Circulars() {
             type="file"
             accept=".pdf"
             onChange={handleFileChange}
+            disabled={isProcessing || loading}
             className="block w-full text-sm text-gray-500
               file:mr-4 file:py-2 file:px-4
               file:rounded-full file:border-0
               file:text-sm file:font-semibold
               file:bg-blue-50 file:text-blue-700
-              hover:file:bg-blue-100 cursor-pointer"
+              hover:file:bg-blue-100 cursor-pointer disabled:opacity-50"
           />
         </label>
       </div>
 
-      {error && (
+      {(error || processError) && (
         <div className="bg-red-50 border-l-4 border-red-500 text-red-700 p-4 rounded">
           <p className="font-bold">Errore</p>
-          <p>{error}</p>
+          <p>{error || processError}</p>
         </div>
       )}
 
-      {loading && (
+      {(loading || isProcessing) && (
         <div className="flex flex-col items-center justify-center p-12 bg-gray-50 rounded-lg border border-gray-200">
           <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600"></div>
           <span className="mt-4 text-gray-600 font-medium">Elaborazione in corso...</span>
