@@ -1,63 +1,76 @@
-import { useState } from "react";
-import { extractTextFromPDF } from "../services/pdfService";
-import { normalizeCircularData } from "../services/circularParser";
-import { normalizeEventData } from "../services/eventParser";
-import type { Circular } from "../types/Circular";
+import { useState, useEffect } from 'react';
 
-export function useCircular() {
-  const [loading, setLoading] = useState(false);
-  const [circular, setCircular] = useState<Circular | null>(null);
+const API_URL = "https://school-agent-backend.onrender.com";
+
+export interface Circular {
+  id: string;
+  fileName: string;
+  number: string;
+  date: string;
+  subject: string;
+  summary: string;
+  priority: string;
+  recipients: string;
+  deadlines: string;
+  createdAt: string;
+  events: Event[];
+}
+
+export interface Event {
+  id: string;
+  title: string;
+  type: string;
+  date: string;
+  startTime: string;
+  endTime: string;
+  location: string;
+  circularNumber: string;
+}
+
+export function useCirculars() {
+  const [circulars, setCirculars] = useState<Circular[]>([]);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const processPDF = async (file: File) => {
-    setLoading(true);
-    setError(null);
-    setCircular(null);
+  useEffect(() => {
+    fetchCirculars();
+  }, []);
 
+  const fetchCirculars = async () => {
     try {
-      // 1. Estrazione testo lato client
-      const text = await extractTextFromPDF(file);
-
-      // 2. Preparazione FormData per inviare il file fisico + il testo
-      const formData = new FormData();
-      formData.append('pdf', file);
-      formData.append('text', text);
-      formData.append('fileName', file.name);
-
-      // 3. Invio al backend (URL del tuo Codespace)
-      const response = await fetch("https://psychic-capybara-wv6qwv4x5vr25pqq-3001.app.github.dev/api/circulars/analyze", {
-        method: "POST",
-        body: formData, 
-      });
-
+      setLoading(true);
+      const response = await fetch(`${API_URL}/api/circulars`);
       if (!response.ok) {
-        const errData = await response.json();
-        throw new Error(errData.error || "Errore durante l'analisi della circolare");
+        throw new Error('Errore nel recupero delle circolari');
       }
-
       const data = await response.json();
-
-      // 4. Normalizzazione e tipizzazione sicura dei dati ricevuti
-      const normalizedInfo = normalizeCircularData(data);
-      const normalizedEvents = normalizeEventData(data.events);
-
-      setCircular({
-        id: data.id,
-        fileName: data.fileName,
-        filePath: data.filePath,
-        text: data.text,
-        createdAt: new Date(data.createdAt),
-        ...normalizedInfo,
-        events: normalizedEvents as any[], 
-      } as Circular);
-
+      setCirculars(data);
+      setError(null);
     } catch (err) {
-      console.error("Errore processPDF:", err);
-      setError(err instanceof Error ? err.message : "Errore sconosciuto durante l'elaborazione");
+      setError(err instanceof Error ? err.message : 'Errore sconosciuto');
     } finally {
       setLoading(false);
     }
   };
 
-  return { loading, circular, error, processPDF };
+  return { circulars, loading, error, refetch: fetchCirculars };
+}
+
+export async function analyzeCircular(file: File, text: string): Promise<Circular> {
+  const formData = new FormData();
+  formData.append('pdf', file);
+  formData.append('text', text);
+  formData.append('fileName', file.name);
+
+  const response = await fetch(`${API_URL}/api/circulars/analyze`, {
+    method: 'POST',
+    body: formData,
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json();
+    throw new Error(errorData.error || 'Errore durante l\'analisi della circolare');
+  }
+
+  return await response.json();
 }

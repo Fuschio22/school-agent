@@ -21,7 +21,7 @@ export default function VisualCalendar({ events }: VisualCalendarProps) {
   useEffect(() => {
     if (events && events.length > 0) {
       const firstEvent = events[0];
-      const [day, month, year] = firstEvent.date.split("/").map(Number);
+      const [_day, month, year] = firstEvent.date.split("/").map(Number);
       setCurrentDate(new Date(year, month - 1, 1));
     }
   }, [events]);
