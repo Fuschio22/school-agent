@@ -1,6 +1,6 @@
 import type { SchoolEvent } from "../types/SchoolEvent";
 
-const VALID_TYPES = ["CDC", "COLLEGIO", "GLO", "GLI", "DIPARTIMENTO", "SCRUTINIO", "FORMAZIONE", "ALTRO"];
+const VALID_TYPES = ["Consigli di Classe", "Collegio dei Docenti", "GLO", "GLI", "Dipartimenti Disciplinari", "SCRUTINIO", "FORMAZIONE", "ALTRO"];
 
 export function normalizeEventData(events: any[]): Partial<SchoolEvent>[] {
   if (!Array.isArray(events)) return [];
