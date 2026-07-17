@@ -2,7 +2,7 @@ import { Request, Response } from "express";
 import { analyzeCircularText } from "../services/aiService";
 import { prisma } from "../lib/prisma";
 
-// Funzione 1: Analizza e salva una nuova circolare
+// Funzione 1: Analizza e salva (o aggiorna) una circolare
 export const analyzeCircularController = async (req: Request, res: Response) => {
   try {
     const { text, fileName } = req.body;
@@ -30,12 +30,58 @@ export const analyzeCircularController = async (req: Request, res: Response) => 
       : (Array.isArray(analysis.consigliDiClasse) ? analysis.consigliDiClasse : []);
     const orderOfDay = Array.isArray(analysis.ordineDelGiorno) ? analysis.ordineDelGiorno : [];
 
+    const numeroCircolare = String(circData.numero || "");
+    const dataCircolare = String(circData.data || "");
+
+    // 1. CONTROLLA SE ESISTE GIÀ (Anti-duplicato)
+    const existingCircular = await prisma.circular.findFirst({
+      where: {
+        number: numeroCircolare,
+        date: dataCircolare,
+      },
+      include: { events: true }
+    });
+
+    if (existingCircular) {
+      // Se esiste, cancelliamo i vecchi eventi e aggiorniamo la circolare
+      await prisma.event.deleteMany({
+        where: { circularId: existingCircular.id }
+      });
+
+      const updatedCircular = await prisma.circular.update({
+        where: { id: existingCircular.id },
+        data: {
+          fileName: fileName || existingCircular.fileName,
+          filePath: filePath || existingCircular.filePath,
+          subject: String(circData.oggetto || existingCircular.subject),
+          summary: orderOfDay.length > 0 ? orderOfDay.join("\n") : existingCircular.summary,
+          text: text,
+          events: {
+            create: eventsData.map((event: any) => ({
+              title: event.title || `${event.classe || "Classe"} - ${event.sede || "Sede"}`,
+              type: event.type || "Consigli di Classe", // <-- ORA USA IL TIPO DELL'AI
+              date: String(event.data || ""),
+              startTime: String(event.oraInizio || "15:00"),
+              endTime: String(event.oraFine || "16:00"),
+              location: String(event.sede || "Sede scolastica"),
+              circularNumber: numeroCircolare,
+            })),
+          },
+        },
+        include: { events: true },
+      });
+
+      console.log("✅ Circolare AGGIORNATA con successo nel DB. ID:", updatedCircular.id);
+      return res.json(updatedCircular);
+    }
+
+    // 2. SE NON ESISTE, LA CREA (Nuova)
     const circular = await prisma.circular.create({
       data: {
         fileName: fileName || "documento.pdf",
         filePath: filePath,
-        number: String(circData.numero || ""),
-        date: String(circData.data || ""),
+        number: numeroCircolare,
+        date: dataCircolare,
         subject: String(circData.oggetto || ""),
         summary: orderOfDay.length > 0 ? orderOfDay.join("\n") : "Nessun ordine del giorno",
         priority: "media",
@@ -45,20 +91,20 @@ export const analyzeCircularController = async (req: Request, res: Response) => 
         userId: user.id,
         events: {
           create: eventsData.map((event: any) => ({
-            title: `${event.classe || "Classe non specificata"} - ${event.sede || "Sede non specificata"}`,
-            type: "CDC",
+            title: event.title || `${event.classe || "Classe"} - ${event.sede || "Sede"}`,
+            type: event.type || "Consigli di Classe", // <-- ORA USA IL TIPO DELL'AI
             date: String(event.data || ""),
             startTime: String(event.oraInizio || "15:00"),
             endTime: String(event.oraFine || "16:00"),
             location: String(event.sede || "Sede scolastica"),
-            circularNumber: String(circData.numero || ""),
+            circularNumber: numeroCircolare,
           })),
         },
       },
       include: { events: true },
     });
 
-    console.log("✅ Circolare salvata con successo nel DB. ID:", circular.id);
+    console.log("✅ Circolare SALVATA con successo nel DB. ID:", circular.id);
     res.json(circular);
   } catch (error) {
     console.error("❌ Errore analisi circolare:", error);
