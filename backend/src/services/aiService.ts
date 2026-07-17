@@ -24,6 +24,8 @@ export async function analyzeCircularText(text: string) {
           },
           "eventi": [
             {
+              "title": "string (es: 'Consiglio di Classe 3A')",
+              "type": "string (es: 'Consigli di Classe')",
               "sede": "string",
               "data": "DD/MM/YYYY",
               "oraInizio": "HH:MM",
@@ -38,7 +40,8 @@ export async function analyzeCircularText(text: string) {
         1. Crea UN evento per OGNI riga delle tabelle nel testo.
         2. Normalizza gli orari: se trovi '17.00', convertilo in '17:00'.
         3. Copia l'ordine del giorno ESATTAMENTE come nel testo, dividendolo in un array di stringhe.
-        4. Restituisci SOLO il JSON, senza markdown o testo aggiuntivo.`
+        4. Restituisci SOLO il JSON, senza markdown o testo aggiuntivo.
+        5. VIETATO usare abbreviazioni. Scrivi SEMPRE i nomi per esteso: usa "Consigli di Classe" (MAI "CDC"), "Collegio dei Docenti" (MAI "Collegio"), "Dipartimenti Disciplinari".`
       },
       {
         role: "user",
@@ -48,7 +51,6 @@ export async function analyzeCircularText(text: string) {
     response_format: { type: "json_object" }
   });
 
-  // Controllo di sicurezza per evitare l'errore "possibly undefined"
   const content = response.choices[0]?.message?.content || "{}";
   return JSON.parse(content);
 }
