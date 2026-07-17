@@ -16,12 +16,27 @@ interface SavedCircular {
   createdAt: string;
 }
 
+const renderNumberedSummary = (summary: string) => {
+  if (!summary || summary === "Nessun riassunto.") {
+    return <span className="text-gray-500 italic">Nessun riassunto disponibile.</span>;
+  }
+  
+  const lines = summary.split('\n').filter(line => line.trim() !== '');
+  
+  return lines.map((line, index) => (
+    <div key={index} className="flex items-start mb-2 last:mb-0">
+      <span className="font-bold text-blue-700 mr-3 min-w-[1.5rem] text-right">
+        {index + 1}.
+      </span>
+      <span className="text-gray-700 leading-relaxed">{line.trim()}</span>
+    </div>
+  ));
+};
+
 export default function Circulars() {
-  // RIMOSSO 'refetch' perché non veniva usato
   const { circulars, loading, error } = useCirculars();
   
   const [savedCirculars, setSavedCirculars] = useState<SavedCircular[]>([]);
-  const [selectedCircular, setSelectedCircular] = useState<SavedCircular | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [processError, setProcessError] = useState<string | null>(null);
 
@@ -140,43 +155,50 @@ export default function Circulars() {
         {savedCirculars.length === 0 ? (
           <p className="text-gray-500 italic">Nessuna circolare salvata nel database.</p>
         ) : (
-          <div className="space-y-3">
+          <div className="space-y-4">
             {savedCirculars.map((circ) => (
               <div 
                 key={circ.id} 
-                onClick={() => setSelectedCircular(selectedCircular?.id === circ.id ? null : circ)}
-                className={`p-4 rounded-lg border cursor-pointer transition-all ${
-                  selectedCircular?.id === circ.id 
-                    ? "bg-blue-50 border-blue-300 ring-1 ring-blue-300" 
-                    : "bg-gray-50 border-gray-200 hover:bg-gray-100"
-                }`}
+                className="p-4 rounded-lg border bg-gray-50 border-gray-200 transition-all hover:shadow-md"
               >
-                <div className="flex justify-between items-start">
+                <div className="flex justify-between items-start mb-4">
                   <div>
-                    <p className="font-bold text-gray-900">Circolare n. {circ.number || "N/D"} - {circ.date || "Data N/D"}</p>
-                    <p className="text-sm text-gray-600 mt-1">{circ.subject || "Nessun oggetto"}</p>
-                    <p className="text-xs text-gray-400 mt-2">{circ.events?.length || 0} eventi estratti • Caricata il {new Date(circ.createdAt).toLocaleDateString('it-IT')}</p>
+                    <p className="font-bold text-gray-900 text-lg">
+                      Circolare n. {circ.number || "N/D"} 
+                      <span className="text-gray-500 font-normal"> - {circ.date || "Data N/D"}</span>
+                    </p>
+                    <p className="text-sm text-gray-700 mt-1 font-medium">{circ.subject || "Nessun oggetto"}</p>
+                    <p className="text-xs text-gray-400 mt-2">
+                      {circ.events?.length || 0} eventi estratti • Caricata il {new Date(circ.createdAt).toLocaleDateString('it-IT')}
+                    </p>
                   </div>
-                  <div className="flex gap-2" onClick={(e) => e.stopPropagation()}>
-                    <button onClick={() => handleDownloadPDF(circ)} className="text-xs bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 px-3 py-1.5 rounded-md transition-colors">📄 PDF</button>
-                    <button onClick={() => handleDownloadICS(circ)} className="text-xs bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-md transition-colors">📥 .ics</button>
+                  <div className="flex gap-2">
+                    <button onClick={() => handleDownloadPDF(circ)} className="text-xs bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 px-3 py-1.5 rounded-md transition-colors font-medium">
+                      📄 PDF
+                    </button>
+                    <button onClick={() => handleDownloadICS(circ)} className="text-xs bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-md transition-colors font-medium">
+                      📥 .ics
+                    </button>
                   </div>
                 </div>
 
-                {selectedCircular?.id === circ.id && (
-                  <div className="mt-4 pt-4 border-t border-blue-200 animate-in fade-in slide-in-from-top-2">
-                    <h4 className="text-sm font-semibold text-blue-900 mb-2">Ordine del Giorno</h4>
-                    <p className="text-sm text-gray-700 whitespace-pre-wrap bg-white p-3 rounded border border-blue-100 mb-4">
-                      {circ.summary || "Nessun riassunto."}
-                    </p>
-                    {circ.events && circ.events.length > 0 && (
-                      <>
-                        <h4 className="text-sm font-semibold text-blue-900 mb-2">Eventi ({circ.events.length})</h4>
-                        <VisualCalendar events={circ.events} />
-                      </>
-                    )}
+                <div className="mt-4 pt-4 border-t border-gray-200 bg-white p-4 rounded-lg border border-gray-100">
+                  <h4 className="text-sm font-bold text-blue-900 mb-3 flex items-center gap-2">
+                    <span>📋</span> Ordine del Giorno
+                  </h4>
+                  <div className="mb-6">
+                    {renderNumberedSummary(circ.summary)}
                   </div>
-                )}
+                  
+                  {circ.events && circ.events.length > 0 && (
+                    <>
+                      <h4 className="text-sm font-bold text-blue-900 mb-3 flex items-center gap-2">
+                        <span></span> Calendario Eventi ({circ.events.length})
+                      </h4>
+                      <VisualCalendar events={circ.events} />
+                    </>
+                  )}
+                </div>
               </div>
             ))}
           </div>
