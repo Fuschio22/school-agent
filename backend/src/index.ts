@@ -3,7 +3,8 @@ import cors from "cors";
 import dotenv from "dotenv";
 import path from "path";
 import circularRoutes from "./routes/circularRoutes";
-import chatRoutes from "./routes/chatRoutes"; // <-- AGGIUNTA: Import delle rotte chat
+import chatRoutes from "./routes/chatRoutes";
+import userRoutes from "./routes/userRoutes"; // <-- AGGIUNTA
 
 dotenv.config();
 
@@ -15,11 +16,9 @@ app.use(express.json({ limit: "10mb" }));
 
 app.use("/uploads", express.static(path.join(__dirname, "../uploads")));
 
-// Rotte esistenti
 app.use("/api/circulars", circularRoutes);
-
-// <-- AGGIUNTA: Rotte per la chat AI
 app.use("/api/chat", chatRoutes);
+app.use("/api/users", userRoutes); // <-- AGGIUNTA
 
 app.listen(PORT, () => {
   console.log(`✅ Backend attivo su http://localhost:${PORT}`);
