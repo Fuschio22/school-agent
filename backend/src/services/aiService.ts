@@ -24,27 +24,43 @@ export async function analyzeCircularText(text: string) {
           },
           "eventi": [
             {
-              "title": "string (es: 'GLO 1A Liceo Scientifico Siniscola' o 'Consiglio di Classe 4A IPSASR')",
-              "type": "string (es: 'GLO', 'Consigli di Classe')",
+              "title": "string (es: 'Dipartimenti Disciplinari' o 'Consiglio di Classe 4A IPSASR')",
+              "type": "string (es: 'Dipartimenti Disciplinari', 'Consigli di Classe', 'Collegio dei Docenti')",
               "sede": "string (DEVE contenere l'istituto completo: 'Liceo Scientifico Siniscola', 'IPSASR', ecc.)",
               "data": "DD/MM/YYYY",
               "oraInizio": "HH:MM",
               "oraFine": "HH:MM",
-              "classe": "string (es: '1A', '4A', '5B')"
+              "classe": "string (es: '1A', '4A', '5B', o vuoto se evento generale)"
             }
           ],
           "ordineDelGiorno": ["array di stringhe"]
         }
 
-        REGOLE FONDAMENTALI PER PDF CON PIÙ SEZIONI:
+        REGOLE FONDAMENTALI:
         
-        1. QUANDO IL PDF HA PIÙ TABELLE/SEZIONI:
-           - Leggi l'intestazione di OGNI sezione (es: "IPSASR", "LICEO SCIENTIFICO DORGALI", "ITTL", "LICEO SCIENTIFICO SINISCOLA")
-           - Per OGNI riga della tabella, ASSOCIA quella sede/istituto alla classe
-           - Esempio: Se vedi "LICEO SCIENTIFICO SINISCOLA" e sotto "1^A", crea: 
-             title: "GLO 1A Liceo Scientifico Siniscola"
-             sede: "Liceo Scientifico Siniscola"
-             classe: "1A"
+        1. ESTRATTORI DI EVENTI - DUE METODI:
+           
+           METODO A - TABELLE:
+           - Se ci sono tabelle nel testo, crea UN evento per OGNI riga
+           - Leggi l'intestazione di ogni sezione (es: "IPSASR", "LICEO SCIENTIFICO SINISCOLA")
+           - Associa la sede a tutte le classi nella tabella sottostante
+           
+           METODO B - TESTO DESCRITTIVO (IMPORTANTE!):
+           - Se NON ci sono tabelle ma il testo contiene informazioni su convocazioni, crea eventi dal testo
+           - Cerca frasi come:
+             * "convocati il giorno X alle ore Y"
+             * "si riuniranno il giorno X alle ore Y"
+             * "dalle ore X alle ore Y"
+             * "presso la sede Z"
+           - Estrai data, orario e sede da queste frasi
+           - Esempio: "I Dipartimenti sono convocati il giorno giovedì 23 ottobre 2025 alle ore 17:30, presso la sede centrale di Siniscola"
+             → Crea evento con:
+               title: "Dipartimenti Disciplinari"
+               type: "Dipartimenti Disciplinari"
+               sede: "Sede Centrale Siniscola"
+               data: "23/10/2025"
+               oraInizio: "17:30"
+               oraFine: "18:30" (se specificata, altrimenti calcola +1 ora)
         
         2. NORMALIZZA LE CLASSI:
            - "1^A" → "1A"
@@ -53,15 +69,15 @@ export async function analyzeCircularText(text: string) {
            - Rimuovi il simbolo "^" e gli spazi
         
         3. CALCOLO ORARIO DI FINE:
-           - Se vedi solo l'orario di inizio, calcola la fine dalla riga successiva
-           - Esempio: 1^A inizia 15:00, 4^A inizia 15:45 → 1^A finisce 15:45
-           - Se non c'è riga dopo, usa 45 minuti
+           - Se vedi "dalle ore X alle ore Y", usa entrambi
+           - Se vedi solo orario di inizio in tabella, calcola la fine dalla riga successiva
+           - Se non c'è riga dopo e non è specificato, usa +1 ora dall'inizio
         
         4. USA NOMI COMPLETI:
-           - Type: "GLO", "Consigli di Classe", "Collegio dei Docenti" (MAI abbreviazioni)
-           - Sede: Scrivi SEMPRE l'istituto completo (es: "Liceo Scientifico Siniscola", NON solo "Siniscola")
+           - Type: "Dipartimenti Disciplinari", "Consigli di Classe", "Collegio dei Docenti", "GLO" (MAI abbreviazioni)
+           - Sede: Scrivi SEMPRE l'istituto completo
         
-        5. Crea UN evento per OGNI riga di OGNI tabella
+        5. Crea eventi per OGNI convocazione trovata (sia in tabelle che nel testo)
         
         6. Restituisci SOLO JSON, niente markdown o testo aggiuntivo`
       },

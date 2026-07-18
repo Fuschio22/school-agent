@@ -102,7 +102,9 @@ export default function Calendar() {
     );
   }
 
-  const selectedDayEvents = selectedDay ? getEventsForDate(selectedDay) : [];
+  const selectedDayEvents = selectedDay 
+  ? getEventsForDate(selectedDay).sort((a, b) => a.startTime.localeCompare(b.startTime))
+  : [];
 
   return (
     <div className="p-8 relative">
