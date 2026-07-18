@@ -43,6 +43,12 @@ const calculateDurationHours = (startTime: string, endTime: string): number => {
   const startMinutes = startHour * 60 + startMin;
   const endMinutes = endHour * 60 + endMin;
   
+  // Se l'orario di fine è prima dell'inizio, c'è un errore nei dati
+  if (endMinutes <= startMinutes) {
+    console.warn(`⚠️ Orario non valido: ${startTime} - ${endTime}. Impostato a 0.`);
+    return 0;
+  }
+  
   const durationMinutes = endMinutes - startMinutes;
   return durationMinutes / 60; // Converte in ore
 };
@@ -183,10 +189,29 @@ export default function Hours() {
 
   // Funzione per formattare le ore (es. 2.25 → 2h 15min)
   const formatHours = (hours: number): string => {
+    if (hours === 0) return "0min";
     const h = Math.floor(hours);
     const m = Math.round((hours - h) * 60);
-    if (m === 0) return `${h}`;
+    if (m === 0) return `${h}h`;
     return `${h}h ${m}min`;
+  };
+
+  // Funzione per ordinare gli eventi per data e ora
+  const sortEventsByDateAndTime = (events: Event[]): Event[] => {
+    return events.sort((a, b) => {
+      // Prima ordina per data
+      const dateA = new Date(a.date.split('/').reverse().join('-'));
+      const dateB = new Date(b.date.split('/').reverse().join('-'));
+      
+      if (dateA.getTime() !== dateB.getTime()) {
+        return dateA.getTime() - dateB.getTime();
+      }
+      
+      // Se la data è uguale, ordina per orario di inizio
+      const timeA = a.startTime.replace(':', '');
+      const timeB = b.startTime.replace(':', '');
+      return timeA.localeCompare(timeB);
+    });
   };
 
   return (
@@ -319,7 +344,7 @@ export default function Hours() {
                       )}
                     </div>
 
-                    {/* Tabella eventi del mese */}
+                    {/* Tabella eventi del mese - ORDINATA per data e ora */}
                     <div className="overflow-x-auto">
                       <table className="w-full text-sm">
                         <thead>
@@ -333,14 +358,11 @@ export default function Hours() {
                           </tr>
                         </thead>
                         <tbody>
-                          {monthStat.events
-                            .sort((a, b) => {
-                              const dateA = new Date(a.date.split('/').reverse().join('-'));
-                              const dateB = new Date(b.date.split('/').reverse().join('-'));
-                              return dateA.getTime() - dateB.getTime();
-                            })
+                          {sortEventsByDateAndTime(monthStat.events)
                             .map((event) => {
                               const duration = calculateDurationHours(event.startTime, event.endTime);
+                              const hasInvalidTime = duration === 0 && event.startTime > event.endTime;
+                              
                               return (
                                 <tr key={event.id} className="border-b border-slate-800/50 hover:bg-slate-800/30">
                                   <td className="p-2 text-slate-300">{event.date}</td>
@@ -350,8 +372,22 @@ export default function Hours() {
                                     </span>
                                   </td>
                                   <td className="p-2 text-slate-300">{event.title}</td>
-                                  <td className="p-2 text-slate-300">{event.startTime} - {event.endTime}</td>
-                                  <td className="p-2 text-blue-400 font-semibold">{formatHours(duration)}</td>
+                                  <td className="p-2 text-slate-300">
+                                    {hasInvalidTime ? (
+                                      <span className="text-red-400 font-semibold">
+                                        {event.startTime} - {event.endTime} ️
+                                      </span>
+                                    ) : (
+                                      event.startTime + ' - ' + event.endTime
+                                    )}
+                                  </td>
+                                  <td className="p-2 font-semibold">
+                                    {hasInvalidTime ? (
+                                      <span className="text-red-400">Errore</span>
+                                    ) : (
+                                      <span className="text-blue-400">{formatHours(duration)}</span>
+                                    )}
+                                  </td>
                                   <td className="p-2 text-slate-400 text-xs">{event.location}</td>
                                 </tr>
                               );
