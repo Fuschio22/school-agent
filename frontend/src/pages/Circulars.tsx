@@ -39,6 +39,7 @@ export default function Circulars() {
   const [savedCirculars, setSavedCirculars] = useState<SavedCircular[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [processError, setProcessError] = useState<string | null>(null);
+  const [isDeleting, setIsDeleting] = useState<string | null>(null); // <-- NUOVO: tiene traccia della circolare in eliminazione
 
   useEffect(() => {
     fetchSavedCirculars();
@@ -59,6 +60,36 @@ export default function Circulars() {
       }
     } catch (err) {
       console.error("Errore nel caricamento dell'archivio:", err);
+    }
+  };
+
+  // <-- NUOVA FUNZIONE: Elimina una circolare
+  const handleDeleteCircular = async (id: string, numero: string) => {
+    // Chiedi conferma
+    const confirmed = window.confirm(
+      `⚠️ Sei sicuro di voler eliminare la Circolare n. ${numero}?\n\nQuesta azione eliminerà anche tutti gli eventi associati e non potrà essere annullata.`
+    );
+
+    if (!confirmed) return;
+
+    setIsDeleting(id);
+    try {
+      const response = await fetch(`https://school-agent-backend.onrender.com/api/circulars/${id}`, {
+        method: 'DELETE',
+      });
+
+      if (response.ok) {
+        alert('✅ Circolare eliminata con successo!');
+        await fetchSavedCirculars(); // Ricarica la lista
+      } else {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Errore durante l\'eliminazione');
+      }
+    } catch (err: any) {
+      alert(`❌ Errore: ${err.message}`);
+      console.error("Errore nell'eliminazione della circolare:", err);
+    } finally {
+      setIsDeleting(null);
     }
   };
 
@@ -173,6 +204,23 @@ export default function Circulars() {
                     </p>
                   </div>
                   <div className="flex gap-2">
+                    {/* <-- NUOVO PULSANTE: Elimina */}
+                    <button 
+                      onClick={() => handleDeleteCircular(circ.id, circ.number)} 
+                      disabled={isDeleting === circ.id}
+                      className="text-xs bg-red-600 hover:bg-red-700 disabled:bg-red-400 text-white px-3 py-1.5 rounded-md transition-colors font-medium flex items-center gap-1"
+                    >
+                      {isDeleting === circ.id ? (
+                        <>
+                          <span className="animate-spin"></span> Elimino...
+                        </>
+                      ) : (
+                        <>
+                          <span>🗑️</span> Elimina
+                        </>
+                      )}
+                    </button>
+                    
                     <button onClick={() => handleDownloadPDF(circ)} className="text-xs bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 px-3 py-1.5 rounded-md transition-colors font-medium">
                       📄 PDF
                     </button>
@@ -207,5 +255,3 @@ export default function Circulars() {
     </div>
   );
 }
-
-
