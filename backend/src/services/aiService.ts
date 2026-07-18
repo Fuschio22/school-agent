@@ -47,7 +47,17 @@ export async function analyzeCircularText(text: string) {
            - 5A IPSASR (qualsiasi sede)
            - 1AS, 2AS, 3AS, 4AS, 5AS (Liceo Scientifico Siniscola)
            - 1BS, 2BS, 3BS, 4BS, 5BS (Liceo Scientifico Siniscola)
-           NOTA: Nel testo le classi potrebbero essere scritte in vari modi: "4A", "4^ A", "Classe 4A", "4A IPSASR", "1A Liceo", "1AS", ecc. Riconoscile tutte e normalizzale.
+           
+           RICONOSCIMENTO VARIANTI DI SCRITTURA:
+           - "5^ A" = "5A"
+           - "4^ A" = "4A"
+           - "1^ A" = "1A"
+           - "Classe 5A" = "5A"
+           - "5A IPSASR" = "5A"
+           - "1A Liceo" = "1AS"
+           - "2^ B" = "2B"
+           Normalizza sempre alla forma standard (es: da "5^ A IPSASR" a "5A IPSASR").
+           
            ESCLUDI ASSOLUTAMENTE: 1A IPSASR, 2A IPSASR, 3A IPSASR, e qualsiasi classe del Liceo Scientifico di Dorgali o altre sedi diverse da Siniscola.`
       },
       {
