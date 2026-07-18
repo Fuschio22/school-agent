@@ -88,10 +88,6 @@ export default function Hours() {
   // Raggruppa eventi per mese (solo anno scolastico 2025/2026)
   const groupEventsByMonth = (): MonthlyStats[] => {
     const monthsMap: { [key: string]: MonthlyStats } = {};
-    const monthNames = [
-      "Settembre", "Ottobre", "Novembre", "Dicembre", "Gennaio", "Febbraio",
-      "Marzo", "Aprile", "Maggio", "Giugno", "Luglio"
-    ];
     
     // Mesi dell'anno scolastico: Settembre 2025 - Luglio 2026
     const schoolYearMonths = [
@@ -358,7 +354,7 @@ export default function Hours() {
                                   <td className="p-2 text-slate-300">
                                     {hasInvalidTime ? (
                                       <span className="text-red-400 font-semibold">
-                                        {event.startTime} - {event.endTime} ️
+                                        {event.startTime} - {event.endTime} ⚠️
                                       </span>
                                     ) : (
                                       event.startTime + ' - ' + event.endTime
