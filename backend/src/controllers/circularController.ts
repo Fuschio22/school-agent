@@ -1,7 +1,38 @@
 import { Request, Response } from "express";
 import { analyzeCircularText } from "../services/aiService";
 import { prisma } from "../lib/prisma";
-import { filterEvents } from "../utils/classFilter"; // <-- AGGIUNTA: Import del filtro
+import { filterEvents } from "../utils/classFilter";
+
+// Funzione per estrarre il mese e anno dal titolo/oggetto
+function extractMonthYear(text: string): { month: string; year: string } | null {
+  const months = [
+    "gennaio", "febbraio", "marzo", "aprile", "maggio", "giugno",
+    "luglio", "agosto", "settembre", "ottobre", "novembre", "dicembre"
+  ];
+  
+  const lowerText = text.toLowerCase();
+  
+  for (const month of months) {
+    if (lowerText.includes(month)) {
+      // Cerca l'anno (4 cifre)
+      const yearMatch = text.match(/\b(20\d{2})\b/);
+      if (yearMatch) {
+        return { month, year: yearMatch[1] };
+      }
+    }
+  }
+  
+  return null;
+}
+
+// Funzione per verificare se è una rettifica
+function isRettifica(text: string): boolean {
+  const lowerText = text.toLowerCase();
+  return lowerText.includes("rettifica") || 
+         lowerText.includes("modifica") || 
+         lowerText.includes("variazione") ||
+         lowerText.includes("aggiornamento");
+}
 
 // Funzione 1: Analizza e salva (o aggiorna) una circolare
 export const analyzeCircularController = async (req: Request, res: Response) => {
@@ -31,24 +62,88 @@ export const analyzeCircularController = async (req: Request, res: Response) => 
       : (Array.isArray(analysis.consigliDiClasse) ? analysis.consigliDiClasse : []);
     const orderOfDay = Array.isArray(analysis.ordineDelGiorno) ? analysis.ordineDelGiorno : [];
 
-    // <-- AGGIUNTA: Applichiamo il filtro di sicurezza QUI, prima di salvare
+    // Applichiamo il filtro di sicurezza
     const filteredEventsData = filterEvents(eventsData);
     console.log(`🔍 Filtro applicato: da ${eventsData.length} eventi estratti a ${filteredEventsData.length} eventi permessi.`);
 
     const numeroCircolare = String(circData.numero || "");
     const dataCircolare = String(circData.data || "");
+    const oggetto = String(circData.oggetto || "");
 
-    // 1. CONTROLLA SE ESISTE GIÀ (Anti-duplicato)
-    const existingCircular = await prisma.circular.findFirst({
-      where: {
-        number: numeroCircolare,
-        date: dataCircolare,
-      },
-      include: { events: true }
-    });
+    // Controlla se è una rettifica
+    const rettifica = isRettifica(oggetto);
+    console.log(`📝 È una rettifica? ${rettifica}`);
 
-    if (existingCircular) {
-      // Se esiste, cancelliamo i vecchi eventi e aggiorniamo la circolare
+    let existingCircular = null;
+    let eventsToDelete: string[] = []; // <-- CORRETTO: tipo esplicito
+    let relevantCirculars: any[] = []; // <-- CORRETTO: definito qui, nello scope giusto
+
+    if (rettifica) {
+      // Se è una rettifica, cerca circolari simili per sostituire
+      const monthYear = extractMonthYear(oggetto);
+      
+      if (monthYear) {
+        console.log(`🔍 Cerco eventi da sostituire per: ${monthYear.month} ${monthYear.year}`);
+        
+        // Cerca tutte le circolari che hanno eventi nello stesso mese/anno
+        const similarCirculars = await prisma.circular.findMany({
+          include: { events: true },
+          where: {
+            OR: [
+              { subject: { contains: monthYear.month, mode: 'insensitive' } },
+              { subject: { contains: "Consigli di Classe", mode: 'insensitive' } }
+            ]
+          }
+        });
+
+        // Filtra solo quelle dello stesso mese/anno
+        relevantCirculars = similarCirculars.filter(circ => {
+          const circMonthYear = extractMonthYear(circ.subject);
+          return circMonthYear && 
+                 circMonthYear.month === monthYear.month && 
+                 circMonthYear.year === monthYear.year;
+        });
+
+        if (relevantCirculars.length > 0) {
+          console.log(`📋 Trovate ${relevantCirculars.length} circolari da sostituire`);
+          
+          // Raccogli tutti gli eventi da cancellare
+          for (const circ of relevantCirculars) {
+            eventsToDelete = eventsToDelete.concat(circ.events.map((e: any) => e.id));
+          }
+          
+          // Usa l'ultima circolare trovata come riferimento
+          existingCircular = relevantCirculars[relevantCirculars.length - 1];
+        }
+      }
+    } else {
+      // Se NON è una rettifica, usa la logica anti-duplicato normale
+      existingCircular = await prisma.circular.findFirst({
+        where: {
+          number: numeroCircolare,
+          date: dataCircolare,
+        },
+        include: { events: true }
+      });
+    }
+
+    // Se esistono eventi da cancellare (rettifica), cancellali
+    if (eventsToDelete.length > 0) {
+      console.log(`🗑️ Cancello ${eventsToDelete.length} eventi vecchi`);
+      await prisma.event.deleteMany({
+        where: { id: { in: eventsToDelete } }
+      });
+      
+      // Cancella le circolari vecchie se abbiamo trovato circolari rilevanti
+      if (relevantCirculars.length > 0) {
+        await prisma.circular.deleteMany({
+          where: { id: { in: relevantCirculars.map(c => c.id) } }
+        });
+      }
+    }
+
+    // Se esiste già una circolare con lo stesso numero/data (non rettifica)
+    if (existingCircular && !rettifica) {
       await prisma.event.deleteMany({
         where: { circularId: existingCircular.id }
       });
@@ -58,11 +153,11 @@ export const analyzeCircularController = async (req: Request, res: Response) => 
         data: {
           fileName: fileName || existingCircular.fileName,
           filePath: filePath || existingCircular.filePath,
-          subject: String(circData.oggetto || existingCircular.subject),
+          subject: oggetto || existingCircular.subject,
           summary: orderOfDay.length > 0 ? orderOfDay.join("\n") : existingCircular.summary,
           text: text,
           events: {
-            create: filteredEventsData.map((event: any) => ({ // <-- MODIFICATO: usa filteredEventsData
+            create: filteredEventsData.map((event: any) => ({
               title: event.title || `${event.classe || "Classe"} - ${event.sede || "Sede"}`,
               type: event.type || "Consigli di Classe",
               date: String(event.data || ""),
@@ -80,14 +175,14 @@ export const analyzeCircularController = async (req: Request, res: Response) => 
       return res.json(updatedCircular);
     }
 
-    // 2. SE NON ESISTE, LA CREA (Nuova)
+    // CREA NUOVA CIRCOLARE (o rettifica che sostituisce le vecchie)
     const circular = await prisma.circular.create({
       data: {
         fileName: fileName || "documento.pdf",
         filePath: filePath,
         number: numeroCircolare,
         date: dataCircolare,
-        subject: String(circData.oggetto || ""),
+        subject: oggetto || "",
         summary: orderOfDay.length > 0 ? orderOfDay.join("\n") : "Nessun ordine del giorno",
         priority: "media",
         recipients: JSON.stringify(circData.destinatari || []),
@@ -95,7 +190,7 @@ export const analyzeCircularController = async (req: Request, res: Response) => 
         text: text,
         userId: user.id,
         events: {
-          create: filteredEventsData.map((event: any) => ({ // <-- MODIFICATO: usa filteredEventsData
+          create: filteredEventsData.map((event: any) => ({
             title: event.title || `${event.classe || "Classe"} - ${event.sede || "Sede"}`,
             type: event.type || "Consigli di Classe",
             date: String(event.data || ""),
@@ -109,7 +204,7 @@ export const analyzeCircularController = async (req: Request, res: Response) => 
       include: { events: true },
     });
 
-    console.log("✅ Circolare SALVATA con successo nel DB. ID:", circular.id);
+    console.log(`✅ Circolare ${rettifica ? 'RETTIFICA' : 'SALVATA'} con successo nel DB. ID:`, circular.id);
     res.json(circular);
   } catch (error) {
     console.error("❌ Errore analisi circolare:", error);
