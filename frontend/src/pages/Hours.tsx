@@ -32,7 +32,6 @@ export default function Hours() {
         const response = await fetch(`${BACKEND_URL}/api/circulars`);
         const data: Circular[] = await response.json();
         
-        // Estrai solo gli eventi
         const allEvents: Event[] = [];
         data.forEach((circular: Circular) => {
           if (circular.events) {
@@ -89,10 +88,14 @@ export default function Hours() {
   
   const gliEvents = filteredEvents.filter(e => e.type === "GLI");
   const gliHours = gliEvents.length;
+  
+  const colloquiEvents = filteredEvents.filter(e => e.type === "Colloqui Scuola-Famiglia");
+  const colloquiHours = colloquiEvents.length;
 
   // Raggruppamenti richiesti
   const cdcGloHours = cdcHours + gloHours;
   const collegiDipartimentiHours = collegiHours + dipartimentiHours;
+  const altriHours = gliHours + colloquiHours;
 
   // Calcola ore per classe
   const hoursByClass: { [key: string]: Event[] } = {};
@@ -166,34 +169,77 @@ export default function Hours() {
         <p className="text-slate-400 mt-2">ore totali nel periodo selezionato</p>
       </div>
 
-      {/* Ore per Tipo - RAGGRUPPATE */}
+      {/* Ore per Tipo - DETTAGLIATE */}
       <div className="rounded-2xl bg-slate-900 p-6 border border-slate-800">
         <h2 className="text-2xl font-semibold mb-4">Ore per Tipo di Evento</h2>
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {/* Gruppo 1: Consigli di Classe + GLO */}
+          {/* Consigli di Classe */}
           <div className="p-4 bg-slate-800 rounded-lg border border-slate-700">
-            <h3 className="font-semibold text-white mb-2">Consigli di Classe + GLO</h3>
-            <p className="text-3xl font-bold text-blue-400">{cdcGloHours}</p>
-            <p className="text-sm text-slate-400 mt-1">
-              (CDC: {cdcHours} + GLO: {gloHours})
-            </p>
+            <h3 className="font-semibold text-white mb-2">Consigli di Classe</h3>
+            <p className="text-3xl font-bold text-blue-400">{cdcHours}</p>
+            <p className="text-sm text-slate-400">ore</p>
           </div>
 
-          {/* Gruppo 2: Collegi + Dipartimenti */}
+          {/* GLO */}
           <div className="p-4 bg-slate-800 rounded-lg border border-slate-700">
-            <h3 className="font-semibold text-white mb-2">Collegi + Dipartimenti</h3>
-            <p className="text-3xl font-bold text-green-400">{collegiDipartimentiHours}</p>
-            <p className="text-sm text-slate-400 mt-1">
-              (Collegi: {collegiHours} + Dipartimenti: {dipartimentiHours})
-            </p>
+            <h3 className="font-semibold text-white mb-2">GLO</h3>
+            <p className="text-3xl font-bold text-purple-400">{gloHours}</p>
+            <p className="text-sm text-slate-400">ore</p>
           </div>
 
-          {/* GLI (separato) */}
+          {/* Collegio dei Docenti */}
+          <div className="p-4 bg-slate-800 rounded-lg border border-slate-700">
+            <h3 className="font-semibold text-white mb-2">Collegio dei Docenti</h3>
+            <p className="text-3xl font-bold text-green-400">{collegiHours}</p>
+            <p className="text-sm text-slate-400">ore</p>
+          </div>
+
+          {/* Dipartimenti */}
+          <div className="p-4 bg-slate-800 rounded-lg border border-slate-700">
+            <h3 className="font-semibold text-white mb-2">Dipartimenti</h3>
+            <p className="text-3xl font-bold text-orange-400">{dipartimentiHours}</p>
+            <p className="text-sm text-slate-400">ore</p>
+          </div>
+
+          {/* GLI */}
           {gliHours > 0 && (
             <div className="p-4 bg-slate-800 rounded-lg border border-slate-700">
               <h3 className="font-semibold text-white mb-2">GLI</h3>
-              <p className="text-3xl font-bold text-purple-400">{gliHours}</p>
+              <p className="text-3xl font-bold text-yellow-400">{gliHours}</p>
               <p className="text-sm text-slate-400">ore</p>
+            </div>
+          )}
+
+          {/* Colloqui */}
+          {colloquiHours > 0 && (
+            <div className="p-4 bg-slate-800 rounded-lg border border-slate-700">
+              <h3 className="font-semibold text-white mb-2">Colloqui</h3>
+              <p className="text-3xl font-bold text-pink-400">{colloquiHours}</p>
+              <p className="text-sm text-slate-400">ore</p>
+            </div>
+          )}
+        </div>
+
+        {/* Riepilogo raggruppato */}
+        <div className="mt-6 pt-6 border-t border-slate-800">
+          <h3 className="text-xl font-semibold text-white mb-4">Riepilogo per Categorie</h3>
+          <div className="grid gap-4 md:grid-cols-2">
+            <div className="p-4 bg-blue-900/20 rounded-lg border border-blue-600/30">
+              <h4 className="font-semibold text-blue-300 mb-2">Consigli di Classe + GLO</h4>
+              <p className="text-3xl font-bold text-blue-400">{cdcGloHours} ore</p>
+              <p className="text-sm text-slate-400 mt-1">(CDC: {cdcHours} + GLO: {gloHours})</p>
+            </div>
+            <div className="p-4 bg-green-900/20 rounded-lg border border-green-600/30">
+              <h4 className="font-semibold text-green-300 mb-2">Collegi + Dipartimenti</h4>
+              <p className="text-3xl font-bold text-green-400">{collegiDipartimentiHours} ore</p>
+              <p className="text-sm text-slate-400 mt-1">(Collegi: {collegiHours} + Dipartimenti: {dipartimentiHours})</p>
+            </div>
+          </div>
+          {altriHours > 0 && (
+            <div className="mt-4 p-4 bg-purple-900/20 rounded-lg border border-purple-600/30">
+              <h4 className="font-semibold text-purple-300 mb-2">Altri Eventi (GLI + Colloqui)</h4>
+              <p className="text-3xl font-bold text-purple-400">{altriHours} ore</p>
+              <p className="text-sm text-slate-400 mt-1">(GLI: {gliHours} + Colloqui: {colloquiHours})</p>
             </div>
           )}
         </div>
@@ -215,8 +261,8 @@ export default function Hours() {
             <tbody>
               {Object.entries(hoursByClass)
                 .sort(([a], [b]) => a.localeCompare(b))
-                .map(([className, classEvents]) => (
-                  classEvents.map((event, index) => (
+                .map(([className, classEvents]: [string, Event[]]) => (
+                  classEvents.map((event: Event, index: number) => (
                     <tr key={`${event.id}-${index}`} className="border-b border-slate-800 hover:bg-slate-800/50">
                       {index === 0 && (
                         <td className="p-3 font-semibold text-white" rowSpan={classEvents.length}>
