@@ -42,23 +42,28 @@ export async function analyzeCircularText(text: string) {
         3. Copia l'ordine del giorno ESATTAMENTE come nel testo, dividendolo in un array di stringhe.
         4. Restituisci SOLO il JSON, senza markdown o testo aggiuntivo.
         5. VIETATO usare abbreviazioni. Scrivi SEMPRE i nomi per esteso: usa "Consigli di Classe" (MAI "CDC"), "Collegio dei Docenti" (MAI "Collegio"), "Dipartimenti Disciplinari".
-        6. FILTRO CLASSI - ESTRAI SOLO QUESTE 12 CLASSI:
-           - 4A IPSASR (qualsiasi sede)
-           - 5A IPSASR (qualsiasi sede)
-           - 1AS, 2AS, 3AS, 4AS, 5AS (Liceo Scientifico Siniscola)
-           - 1BS, 2BS, 3BS, 4BS, 5BS (Liceo Scientifico Siniscola)
+        6. FILTRO CLASSI - INCLUDI SOLO QUESTE CLASSI (in qualsiasi forma siano scritte):
            
-           RICONOSCIMENTO VARIANTI DI SCRITTURA:
-           - "5^ A" = "5A"
-           - "4^ A" = "4A"
-           - "1^ A" = "1A"
-           - "Classe 5A" = "5A"
-           - "5A IPSASR" = "5A"
-           - "1A Liceo" = "1AS"
-           - "2^ B" = "2B"
-           Normalizza sempre alla forma standard (es: da "5^ A IPSASR" a "5A IPSASR").
+           CLASSI PERMESSE (riconosci tutte le varianti):
+           ✓ 4A IPSASR (anche scritta come: "4^ A IPSASR", "4 A IPSASR", "4A", "4^ A")
+           ✓ 5A IPSASR (anche scritta come: "5^ A IPSASR", "5 A IPSASR", "5A", "5^ A")
+           ✓ 1AS Liceo Scientifico Siniscola (anche: "1^ AS", "1 A Liceo", "1AS", "1^ A")
+           ✓ 2AS Liceo Scientifico Siniscola (anche: "2^ AS", "2 A Liceo", "2AS", "2^ A")
+           ✓ 3AS Liceo Scientifico Siniscola (anche: "3^ AS", "3 A Liceo", "3AS", "3^ A")
+           ✓ 4AS Liceo Scientifico Siniscola (anche: "4^ AS", "4 A Liceo", "4AS", "4^ A")
+           ✓ 5AS Liceo Scientifico Siniscola (anche: "5^ AS", "5 A Liceo", "5AS", "5^ A")
+           ✓ 1BS Liceo Scientifico Siniscola (anche: "1^ BS", "1 B Liceo", "1BS", "1^ B")
+           ✓ 2BS Liceo Scientifico Siniscola (anche: "2^ BS", "2 B Liceo", "2BS", "2^ B")
+           ✓ 3BS Liceo Scientifico Siniscola (anche: "3^ BS", "3 B Liceo", "3BS", "3^ B")
+           ✓ 4BS Liceo Scientifico Siniscola (anche: "4^ BS", "4 B Liceo", "4BS", "4^ B")
+           ✓ 5BS Liceo Scientifico Siniscola (anche: "5^ BS", "5 B Liceo", "5BS", "5^ B")
            
-           ESCLUDI ASSOLUTAMENTE: 1A IPSASR, 2A IPSASR, 3A IPSASR, e qualsiasi classe del Liceo Scientifico di Dorgali o altre sedi diverse da Siniscola.`
+           CLASSI DA ESCLUDERE ASSOLUTAMENTE:
+            1A IPSASR, 2A IPSASR, 3A IPSASR (qualsiasi classe IPSASR da 1A a 3A)
+           ✗ Qualsiasi classe del Liceo Scientifico di Dorgali
+           ✗ Qualsiasi altra classe non elencata sopra
+           
+           Quando trovi una riga, chiediti: "Questa classe è nella lista PERMESSA?" Se SÌ, creala. Se NO, ignorala.`
       },
       {
         role: "user",
