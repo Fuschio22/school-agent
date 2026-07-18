@@ -24,56 +24,46 @@ export async function analyzeCircularText(text: string) {
           },
           "eventi": [
             {
-              "title": "string (es: 'Consiglio di Classe 4A IPSASR' o 'Consiglio di Classe 1AS')",
-              "type": "string (es: 'Consigli di Classe')",
-              "sede": "string",
+              "title": "string (es: 'GLO 1A Liceo Scientifico Siniscola' o 'Consiglio di Classe 4A IPSASR')",
+              "type": "string (es: 'GLO', 'Consigli di Classe')",
+              "sede": "string (DEVE contenere l'istituto completo: 'Liceo Scientifico Siniscola', 'IPSASR', ecc.)",
               "data": "DD/MM/YYYY",
               "oraInizio": "HH:MM",
               "oraFine": "HH:MM",
-              "classe": "string"
+              "classe": "string (es: '1A', '4A', '5B')"
             }
           ],
           "ordineDelGiorno": ["array di stringhe"]
         }
 
-        REGOLE FONDAMENTALI - SEGUI QUESTO ORDINE:
+        REGOLE FONDAMENTALI PER PDF CON PIÙ SEZIONI:
         
-        REGOLA 1 - CONTROLLA SEMPRE LA SEDE (PRIMA DI TUTTO):
-        - Guarda l'intestazione della tabella o della sezione
-        - Se la sede è "Dorgali" → IGNORA TUTTA LA TABELLA, non creare nessun evento
-        - Se la sede è "Siniscola" o "IPSASR" → procedi con le regole successive
-        - Se la sede è "ITTL" o altro istituto → IGNORA TUTTA LA TABELLA
+        1. QUANDO IL PDF HA PIÙ TABELLE/SEZIONI:
+           - Leggi l'intestazione di OGNI sezione (es: "IPSASR", "LICEO SCIENTIFICO DORGALI", "ITTL", "LICEO SCIENTIFICO SINISCOLA")
+           - Per OGNI riga della tabella, ASSOCIA quella sede/istituto alla classe
+           - Esempio: Se vedi "LICEO SCIENTIFICO SINISCOLA" e sotto "1^A", crea: 
+             title: "GLO 1A Liceo Scientifico Siniscola"
+             sede: "Liceo Scientifico Siniscola"
+             classe: "1A"
         
-        REGOLA 2 - CLASSI PERMESSE (SOLO SE LA SEDE È CORRETTA):
-        ✓ Crea eventi SOLO per queste classi:
-          - 4A IPSASR (anche: "4^ A", "4 A IPSASR", "4A") - SOLO sede IPSASR/Siniscola
-          - 5A IPSASR (anche: "5^ A", "5 A IPSASR", "5A") - SOLO sede IPSASR/Siniscola
-          - 1AS, 2AS, 3AS, 4AS, 5AS - SOLO Liceo Scientifico Siniscola
-          - 1BS, 2BS, 3BS, 4BS, 5BS - SOLO Liceo Scientifico Siniscola
+        2. NORMALIZZA LE CLASSI:
+           - "1^A" → "1A"
+           - "4^A" → "4A"
+           - "5^B" → "5B"
+           - Rimuovi il simbolo "^" e gli spazi
         
-        REGOLA 3 - CLASSI VIETATE (NON CREARE MAI):
-        ✗ 1A IPSASR, 2A IPSASR, 3A IPSASR (qualsiasi sede)
-        ✗ 3B IPSASR (qualsiasi sede)
-        ✗ QUALSIASI classe di Dorgali (anche se è 4A, 5A, ecc.)
-        ✗ QUALSIASI classe ITTL
-        ✗ QUALSIASI altra classe non elencata sopra
+        3. CALCOLO ORARIO DI FINE:
+           - Se vedi solo l'orario di inizio, calcola la fine dalla riga successiva
+           - Esempio: 1^A inizia 15:00, 4^A inizia 15:45 → 1^A finisce 15:45
+           - Se non c'è riga dopo, usa 45 minuti
         
-        REGOLA 4 - PRIMA DI CREARE UN EVENTO (CHECKLIST OBBLIGATORIA):
-        1. La sede è Siniscola/IPSASR? Se NO → IGNORA
-        2. La classe è 4A IPSASR o 5A IPSASR? Se SÌ → crea evento
-        3. La classe è 1AS-5AS o 1BS-5BS del Liceo Siniscola? Se SÌ → crea evento
-        4. Altrimenti → IGNORA
+        4. USA NOMI COMPLETI:
+           - Type: "GLO", "Consigli di Classe", "Collegio dei Docenti" (MAI abbreviazioni)
+           - Sede: Scrivi SEMPRE l'istituto completo (es: "Liceo Scientifico Siniscola", NON solo "Siniscola")
         
-        REGOLA 5 - CALCOLO ORARIO:
-        - Se vedi solo orario di inizio, calcola la fine dalla riga successiva
-        - Esempio: 4^A inizia 18:45, 4^B inizia 19:30 → 4^A finisce 19:30
-        - Se non c'è riga dopo, usa 45 minuti
+        5. Crea UN evento per OGNI riga di OGNI tabella
         
-        REGOLA 6 - FORMATO:
-        - Normalizza orari: '17.00' → '17:00'
-        - Usa nomi completi: "Consigli di Classe" (MAI "CDC")
-        - Crea UN evento per riga
-        - Restituisci SOLO JSON, niente altro testo`
+        6. Restituisci SOLO JSON, niente markdown o testo aggiuntivo`
       },
       {
         role: "user",
