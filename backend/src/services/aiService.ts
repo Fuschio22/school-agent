@@ -19,7 +19,7 @@ export async function analyzeCircularText(text: string) {
           "circolare": {
             "numero": "string",
             "data": "string",
-            "oggetto": "string",
+            "oggetto": "string (DEVE SEMPRE essere compilato, mai vuoto)",
             "destinatari": ["array di stringhe"]
           },
           "eventi": [
@@ -38,24 +38,33 @@ export async function analyzeCircularText(text: string) {
 
         REGOLE FONDAMENTALI - LEGGI ATTENTAMENTE:
         
-        1. QUANDO CREARE EVENTI:
+        1. OGGETTO - REGOLA CRITICA:
+           ✅ SE vedi una riga "Oggetto:" → usa quel testo
+           ✅ SE NON vedi "Oggetto:" → GENERA un oggetto sintetico basato sul contenuto principale
+              Esempi:
+              - Se la circolare convoca un Collegio → oggetto: "Convocazione Collegio dei Docenti"
+              - Se convoca Dipartimenti → oggetto: "Convocazione Dipartimenti Disciplinari"
+              - Se convoca Consigli di Classe → oggetto: "Convocazione Consigli di Classe"
+              - Se è una rettifica → oggetto: "Rettifica [tipo evento]"
+           ❌ MAI lasciare l'oggetto vuoto o "N/D"
+        
+        2. QUANDO CREARE EVENTI:
            ✅ Crea eventi SOLO quando vedi CONVOCAZIONI ESPLICITE con:
-              - Data specifica (es: "il giorno giovedì 23 ottobre 2025")
-              - Orario specifico (es: "alle ore 15:30" o "dalle ore 15:30 alle ore 17:30")
+              - Data specifica (es: "il giorno martedì 09 settembre 2025")
+              - Orario specifico (es: "dalle ore 09:00 alle ore 10:30")
               - Luogo specifico (es: "presso l'Aula Magna")
            
            ❌ NON creare eventi da:
               - Frasi come "a conclusione seguiranno...", "seguiranno i Dipartimenti"
               - Note informative o promemoria
               - Riferimenti generici senza data/orario specifici
-              - Esempio: "Si ricorda che a conclusione del Collegio seguiranno i Dipartimenti" → NON creare evento!
         
-        2. EVITA DUPLICATI - REGOLA D'ORO:
+        3. EVITA DUPLICATI - REGOLA D'ORO:
            - Se la circolare convoca UN SOLO evento, crea UN SOLO evento
            - NON creare eventi multipli per la stessa data/orario
            - Se vedi "Sede centrale" e il nome completo dell'istituto, sono la STESSA sede → UN evento
         
-        3. ESTRATTORI DI EVENTI - DUE METODI:
+        4. ESTRATTORI DI EVENTI - DUE METODI:
            
            METODO A - TABELLE:
            - Se ci sono tabelle nel testo, crea UN evento per OGNI riga
@@ -69,27 +78,27 @@ export async function analyzeCircularText(text: string) {
            - Estrai data, orario e sede
            - Crea UN SOLO evento per ogni convocazione distinta
         
-        4. COLLOQUI SCUOLA-FAMIGLIA - INDIRIZZI PERMESSI:
+        5. COLLOQUI SCUOLA-FAMIGLIA - INDIRIZZI PERMESSI:
            ✓ "Liceo Scientifico di Siniscola" → crea evento
            ✓ "Istituto Professionale per l'Agricoltura" → crea evento
             "Istituto Tecnico Trasporti e Logistica" → IGNORA
            ✗ "Liceo Scientifico di Dorgali" → IGNORA
         
-        5. NORMALIZZA LE CLASSI:
+        6. NORMALIZZA LE CLASSI:
            - "1^A" → "1A"
            - "4^A" → "4A"
            - Rimuovi il simbolo "^"
         
-        6. ORARI:
+        7. ORARI:
            - Se vedi "Dalle ore 15:00 alle ore 18:00" → usa entrambi
            - Se vedi solo inizio, calcola fine (+1 ora o dalla riga successiva)
            - NON invertire mai gli orari: oraInizio deve essere SEMPRE < oraFine
         
-        7. USA NOMI COMPLETI:
+        8. USA NOMI COMPLETI:
            - Type: "Dipartimenti Disciplinari", "Consigli di Classe", "Collegio dei Docenti", "GLO"
            - Sede: Scrivi SEMPRE la sede completa
         
-        8. Restituisci SOLO JSON, niente markdown o testo aggiuntivo`
+        9. Restituisci SOLO JSON, niente markdown o testo aggiuntivo`
       },
       {
         role: "user",
