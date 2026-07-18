@@ -83,10 +83,11 @@ export default function Hours() {
     "GLI": filteredEvents.filter(e => e.type === "GLI"),
   };
 
-  // Calcola ore per classe
+  // Calcola ore per classe (regex migliorata per catturare 1AS, 4A IPSASR, ecc.)
   const hoursByClass: { [key: string]: Event[] } = {};
   filteredEvents.forEach(event => {
-    const className = event.title.match(/\d+[A-Z]/)?.[0] || "Altro";
+    // Regex che cattura: 1AS, 2BS, 4A IPSASR, 5A IPSASR, ecc.
+    const className = event.title.match(/\d+[A-Z]S?(?:\s+IPSASR)?/)?.[0] || "Altro";
     if (!hoursByClass[className]) {
       hoursByClass[className] = [];
     }
