@@ -22,7 +22,6 @@ type Circular = {
 };
 
 export default function Hours() {
-  const [circulars, setCirculars] = useState<Circular[]>([]);
   const [events, setEvents] = useState<Event[]>([]);
   const [loading, setLoading] = useState(true);
   const [filterPeriod, setFilterPeriod] = useState<"all" | "month" | "trimester">("all");
@@ -31,10 +30,9 @@ export default function Hours() {
     const fetchData = async () => {
       try {
         const response = await fetch(`${BACKEND_URL}/api/circulars`);
-        const data = await response.json();
+        const data: Circular[] = await response.json();
         
-        setCirculars(data);
-        
+        // Estrai solo gli eventi
         const allEvents: Event[] = [];
         data.forEach((circular: Circular) => {
           if (circular.events) {
