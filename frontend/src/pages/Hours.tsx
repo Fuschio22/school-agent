@@ -75,18 +75,28 @@ export default function Hours() {
   });
 
   // Calcola ore per tipo
-  const hoursByType = {
-    "Consigli di Classe": filteredEvents.filter(e => e.type === "Consigli di Classe"),
-    "Collegio dei Docenti": filteredEvents.filter(e => e.type === "Collegio dei Docenti"),
-    "Dipartimenti Disciplinari": filteredEvents.filter(e => e.type === "Dipartimenti Disciplinari"),
-    "GLO": filteredEvents.filter(e => e.type === "GLO"),
-    "GLI": filteredEvents.filter(e => e.type === "GLI"),
-  };
+  const cdcEvents = filteredEvents.filter(e => e.type === "Consigli di Classe");
+  const cdcHours = cdcEvents.length;
+  
+  const gloEvents = filteredEvents.filter(e => e.type === "GLO");
+  const gloHours = gloEvents.length;
+  
+  const collegiEvents = filteredEvents.filter(e => e.type === "Collegio dei Docenti");
+  const collegiHours = collegiEvents.length;
+  
+  const dipartimentiEvents = filteredEvents.filter(e => e.type === "Dipartimenti Disciplinari");
+  const dipartimentiHours = dipartimentiEvents.length;
+  
+  const gliEvents = filteredEvents.filter(e => e.type === "GLI");
+  const gliHours = gliEvents.length;
 
-  // Calcola ore per classe (regex migliorata per catturare 1AS, 4A IPSASR, ecc.)
+  // Raggruppamenti richiesti
+  const cdcGloHours = cdcHours + gloHours;
+  const collegiDipartimentiHours = collegiHours + dipartimentiHours;
+
+  // Calcola ore per classe
   const hoursByClass: { [key: string]: Event[] } = {};
   filteredEvents.forEach(event => {
-    // Regex che cattura: 1AS, 2BS, 4A IPSASR, 5A IPSASR, ecc.
     const className = event.title.match(/\d+[A-Z]S?(?:\s+IPSASR)?/)?.[0] || "Altro";
     if (!hoursByClass[className]) {
       hoursByClass[className] = [];
@@ -156,17 +166,36 @@ export default function Hours() {
         <p className="text-slate-400 mt-2">ore totali nel periodo selezionato</p>
       </div>
 
-      {/* Ore per Tipo */}
+      {/* Ore per Tipo - RAGGRUPPATE */}
       <div className="rounded-2xl bg-slate-900 p-6 border border-slate-800">
         <h2 className="text-2xl font-semibold mb-4">Ore per Tipo di Evento</h2>
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {Object.entries(hoursByType).map(([type, events]) => (
-            <div key={type} className="p-4 bg-slate-800 rounded-lg border border-slate-700">
-              <h3 className="font-semibold text-white mb-2">{type}</h3>
-              <p className="text-3xl font-bold text-blue-400">{events.length}</p>
+          {/* Gruppo 1: Consigli di Classe + GLO */}
+          <div className="p-4 bg-slate-800 rounded-lg border border-slate-700">
+            <h3 className="font-semibold text-white mb-2">Consigli di Classe + GLO</h3>
+            <p className="text-3xl font-bold text-blue-400">{cdcGloHours}</p>
+            <p className="text-sm text-slate-400 mt-1">
+              (CDC: {cdcHours} + GLO: {gloHours})
+            </p>
+          </div>
+
+          {/* Gruppo 2: Collegi + Dipartimenti */}
+          <div className="p-4 bg-slate-800 rounded-lg border border-slate-700">
+            <h3 className="font-semibold text-white mb-2">Collegi + Dipartimenti</h3>
+            <p className="text-3xl font-bold text-green-400">{collegiDipartimentiHours}</p>
+            <p className="text-sm text-slate-400 mt-1">
+              (Collegi: {collegiHours} + Dipartimenti: {dipartimentiHours})
+            </p>
+          </div>
+
+          {/* GLI (separato) */}
+          {gliHours > 0 && (
+            <div className="p-4 bg-slate-800 rounded-lg border border-slate-700">
+              <h3 className="font-semibold text-white mb-2">GLI</h3>
+              <p className="text-3xl font-bold text-purple-400">{gliHours}</p>
               <p className="text-sm text-slate-400">ore</p>
             </div>
-          ))}
+          )}
         </div>
       </div>
 
