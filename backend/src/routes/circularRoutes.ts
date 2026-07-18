@@ -2,7 +2,11 @@ import { Router } from "express";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
-import { analyzeCircularController, getAllCircularsController } from "../controllers/circularController";
+import { 
+  analyzeCircularController, 
+  getAllCircularsController,
+  deleteCircularController // <-- AGGIUNTO: import per l'eliminazione
+} from "../controllers/circularController";
 
 const router = Router();
 
@@ -27,9 +31,13 @@ const upload = multer({
   }
 });
 
-// QUESTA RIGA È FONDAMENTALE:
+// Recupera tutte le circolari
 router.get("/", getAllCircularsController);
 
+// Analizza e salva una nuova circolare
 router.post("/analyze", upload.single('pdf'), analyzeCircularController);
+
+// ELIMINA una circolare specifica per ID
+router.delete("/:id", deleteCircularController);
 
 export default router;

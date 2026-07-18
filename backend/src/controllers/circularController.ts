@@ -75,8 +75,8 @@ export const analyzeCircularController = async (req: Request, res: Response) => 
     console.log(`📝 È una rettifica? ${rettifica}`);
 
     let existingCircular = null;
-    let eventsToDelete: string[] = []; // <-- CORRETTO: tipo esplicito
-    let relevantCirculars: any[] = []; // <-- CORRETTO: definito qui, nello scope giusto
+    let eventsToDelete: string[] = [];
+    let relevantCirculars: any[] = [];
 
     if (rettifica) {
       // Se è una rettifica, cerca circolari simili per sostituire
@@ -223,5 +223,38 @@ export const getAllCircularsController = async (req: Request, res: Response) => 
   } catch (error) {
     console.error("❌ Errore nel recupero delle circolari:", error);
     res.status(500).json({ error: "Errore nel recupero delle circolari" });
+  }
+};
+
+// Funzione 3: Elimina una circolare
+export const deleteCircularController = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+
+    // Verifica che la circolare esista
+    const circular = await prisma.circular.findUnique({
+      where: { id },
+      include: { events: true }
+    });
+
+    if (!circular) {
+      return res.status(404).json({ error: "Circolare non trovata" });
+    }
+
+    // Elimina prima tutti gli eventi associati
+    await prisma.event.deleteMany({
+      where: { circularId: id }
+    });
+
+    // Poi elimina la circolare
+    await prisma.circular.delete({
+      where: { id }
+    });
+
+    console.log(`✅ Circolare eliminata con successo. ID: ${id}`);
+    res.json({ message: "Circolare eliminata con successo" });
+  } catch (error) {
+    console.error(" Errore nell'eliminazione della circolare:", error);
+    res.status(500).json({ error: "Errore durante l'eliminazione della circolare" });
   }
 };
