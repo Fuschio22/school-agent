@@ -37,9 +37,11 @@ export default function Circulars() {
   const { circulars, loading, error } = useCirculars();
   
   const [savedCirculars, setSavedCirculars] = useState<SavedCircular[]>([]);
+  const [filteredCirculars, setFilteredCirculars] = useState<SavedCircular[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [processError, setProcessError] = useState<string | null>(null);
-  const [isDeleting, setIsDeleting] = useState<string | null>(null); // <-- NUOVO: tiene traccia della circolare in eliminazione
+  const [isDeleting, setIsDeleting] = useState<string | null>(null);
+  const [searchTerm, setSearchTerm] = useState(""); // <-- NUOVO: stato per la ricerca
 
   useEffect(() => {
     fetchSavedCirculars();
@@ -51,12 +53,31 @@ export default function Circulars() {
     }
   }, [circulars]);
 
+  // <-- NUOVO: filtra le circolari quando cambia la ricerca
+  useEffect(() => {
+    if (!searchTerm.trim()) {
+      setFilteredCirculars(savedCirculars);
+    } else {
+      const term = searchTerm.toLowerCase();
+      const filtered = savedCirculars.filter(circ => {
+        const numberMatch = circ.number.toLowerCase().includes(term);
+        const subjectMatch = circ.subject.toLowerCase().includes(term);
+        const dateMatch = circ.date.toLowerCase().includes(term);
+        const fileNameMatch = circ.fileName.toLowerCase().includes(term);
+        
+        return numberMatch || subjectMatch || dateMatch || fileNameMatch;
+      });
+      setFilteredCirculars(filtered);
+    }
+  }, [searchTerm, savedCirculars]);
+
   const fetchSavedCirculars = async () => {
     try {
       const response = await fetch("https://school-agent-backend.onrender.com/api/circulars");
       if (response.ok) {
         const data = await response.json();
         setSavedCirculars(data);
+        setFilteredCirculars(data);
       }
     } catch (err) {
       console.error("Errore nel caricamento dell'archivio:", err);
@@ -148,6 +169,38 @@ export default function Circulars() {
     <div className="p-6 space-y-8 max-w-7xl mx-auto">
       <div className="flex justify-between items-center">
         <h1 className="text-2xl font-bold text-gray-900">Gestione Circolari</h1>
+        
+        {/* <-- NUOVO: Campo di ricerca */}
+        <div className="relative w-96">
+          <input
+            type="text"
+            placeholder="🔍 Cerca per numero, oggetto, data..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full px-4 py-2 pl-10 pr-4 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          />
+          <svg
+            className="absolute left-3 top-2.5 h-5 w-5 text-gray-400"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+            />
+          </svg>
+          {searchTerm && (
+            <button
+              onClick={() => setSearchTerm("")}
+              className="absolute right-3 top-2.5 text-gray-400 hover:text-gray-600"
+            >
+              ✕
+            </button>
+          )}
+        </div>
       </div>
 
       <div className="bg-white shadow-sm border border-gray-200 rounded-lg p-6">
@@ -178,16 +231,27 @@ export default function Circulars() {
         </div>
       )}
 
+      {/* Mostra risultati della ricerca */}
+      {searchTerm && (
+        <div className="text-sm text-gray-600">
+          Trovate <span className="font-semibold">{filteredCirculars.length}</span> circolari per "{searchTerm}"
+        </div>
+      )}
+
       <div className="bg-white shadow-sm border border-gray-200 rounded-lg p-6">
         <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
-          <span>🗄️</span> Archivio Circolari ({savedCirculars.length})
+          <span>🗄️</span> Archivio Circolari ({filteredCirculars.length})
         </h2>
         
-        {savedCirculars.length === 0 ? (
-          <p className="text-gray-500 italic">Nessuna circolare salvata nel database.</p>
+        {filteredCirculars.length === 0 ? (
+          <p className="text-gray-500 italic">
+            {searchTerm 
+              ? `Nessuna circolare trovata per "${searchTerm}".` 
+              : "Nessuna circolare salvata nel database."}
+          </p>
         ) : (
           <div className="space-y-4">
-            {savedCirculars.map((circ) => (
+            {filteredCirculars.map((circ) => (
               <div 
                 key={circ.id} 
                 className="p-4 rounded-lg border bg-gray-50 border-gray-200 transition-all hover:shadow-md"
@@ -216,16 +280,16 @@ export default function Circulars() {
                         </>
                       ) : (
                         <>
-                          <span>🗑️</span> Elimina
+                          <span>️</span> Elimina
                         </>
                       )}
                     </button>
                     
                     <button onClick={() => handleDownloadPDF(circ)} className="text-xs bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 px-3 py-1.5 rounded-md transition-colors font-medium">
-                      📄 PDF
+                       PDF
                     </button>
                     <button onClick={() => handleDownloadICS(circ)} className="text-xs bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-md transition-colors font-medium">
-                      📥 .ics
+                       .ics
                     </button>
                   </div>
                 </div>
