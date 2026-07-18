@@ -97,7 +97,7 @@ export default function Hours() {
     ];
 
     filteredEvents.forEach(event => {
-      const [day, month, year] = event.date.split('/');
+      const [, month, year] = event.date.split('/'); // <-- CORRETTO: rimosso 'day'
       const monthKey = `${year}-${month}`;
       
       if (!monthsMap[monthKey]) {
@@ -139,17 +139,10 @@ export default function Hours() {
   const totalHours = filteredEvents.length;
 
   // Calcola ore per tipo (totale complessivo)
-  const cdcEvents = filteredEvents.filter(e => e.type === "Consigli di Classe");
-  const cdcHours = cdcEvents.length;
-  
-  const gloEvents = filteredEvents.filter(e => e.type === "GLO");
-  const gloHours = gloEvents.length;
-  
-  const collegiEvents = filteredEvents.filter(e => e.type === "Collegio dei Docenti");
-  const collegiHours = collegiEvents.length;
-  
-  const dipartimentiEvents = filteredEvents.filter(e => e.type === "Dipartimenti Disciplinari");
-  const dipartimentiHours = dipartimentiEvents.length;
+  const cdcHours = filteredEvents.filter(e => e.type === "Consigli di Classe").length;
+  const gloHours = filteredEvents.filter(e => e.type === "GLO").length;
+  const collegiHours = filteredEvents.filter(e => e.type === "Collegio dei Docenti").length;
+  const dipartimentiHours = filteredEvents.filter(e => e.type === "Dipartimenti Disciplinari").length;
 
   if (loading) {
     return (
