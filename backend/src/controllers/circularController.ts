@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
 import { analyzeCircularText } from "../services/aiService";
 import { prisma } from "../lib/prisma";
+import { filterEvents } from "../utils/classFilter"; // <-- AGGIUNTA: Import del filtro
 
 // Funzione 1: Analizza e salva (o aggiorna) una circolare
 export const analyzeCircularController = async (req: Request, res: Response) => {
@@ -30,6 +31,10 @@ export const analyzeCircularController = async (req: Request, res: Response) => 
       : (Array.isArray(analysis.consigliDiClasse) ? analysis.consigliDiClasse : []);
     const orderOfDay = Array.isArray(analysis.ordineDelGiorno) ? analysis.ordineDelGiorno : [];
 
+    // <-- AGGIUNTA: Applichiamo il filtro di sicurezza QUI, prima di salvare
+    const filteredEventsData = filterEvents(eventsData);
+    console.log(`🔍 Filtro applicato: da ${eventsData.length} eventi estratti a ${filteredEventsData.length} eventi permessi.`);
+
     const numeroCircolare = String(circData.numero || "");
     const dataCircolare = String(circData.data || "");
 
@@ -57,9 +62,9 @@ export const analyzeCircularController = async (req: Request, res: Response) => 
           summary: orderOfDay.length > 0 ? orderOfDay.join("\n") : existingCircular.summary,
           text: text,
           events: {
-            create: eventsData.map((event: any) => ({
+            create: filteredEventsData.map((event: any) => ({ // <-- MODIFICATO: usa filteredEventsData
               title: event.title || `${event.classe || "Classe"} - ${event.sede || "Sede"}`,
-              type: event.type || "Consigli di Classe", // <-- ORA USA IL TIPO DELL'AI
+              type: event.type || "Consigli di Classe",
               date: String(event.data || ""),
               startTime: String(event.oraInizio || "15:00"),
               endTime: String(event.oraFine || "16:00"),
@@ -90,9 +95,9 @@ export const analyzeCircularController = async (req: Request, res: Response) => 
         text: text,
         userId: user.id,
         events: {
-          create: eventsData.map((event: any) => ({
+          create: filteredEventsData.map((event: any) => ({ // <-- MODIFICATO: usa filteredEventsData
             title: event.title || `${event.classe || "Classe"} - ${event.sede || "Sede"}`,
-            type: event.type || "Consigli di Classe", // <-- ORA USA IL TIPO DELL'AI
+            type: event.type || "Consigli di Classe",
             date: String(event.data || ""),
             startTime: String(event.oraInizio || "15:00"),
             endTime: String(event.oraFine || "16:00"),
