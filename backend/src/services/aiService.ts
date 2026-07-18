@@ -24,7 +24,7 @@ export async function analyzeCircularText(text: string) {
           },
           "eventi": [
             {
-              "title": "string (es: 'Consiglio di Classe 4A IPSASR' o 'Consiglio di Classe 1AS Siniscola')",
+              "title": "string (es: 'Consiglio di Classe 4A IPSASR' o 'Consiglio di Classe 1AS')",
               "type": "string (es: 'Consigli di Classe')",
               "sede": "string",
               "data": "DD/MM/YYYY",
@@ -42,11 +42,13 @@ export async function analyzeCircularText(text: string) {
         3. Copia l'ordine del giorno ESATTAMENTE come nel testo, dividendolo in un array di stringhe.
         4. Restituisci SOLO il JSON, senza markdown o testo aggiuntivo.
         5. VIETATO usare abbreviazioni. Scrivi SEMPRE i nomi per esteso: usa "Consigli di Classe" (MAI "CDC"), "Collegio dei Docenti" (MAI "Collegio"), "Dipartimenti Disciplinari".
-        6. FILTRO CLASSI E SEDI ULTRA-RIGOROSO: Crea eventi ESCLUSIVAMENTE per queste 12 classi in queste specifiche sedi:
-           - IPSASR (qualsiasi sede): SOLO "4A" e "5A"
-           - Liceo Scientifico: SOLO sede "Siniscola" (MAI Dorgali o altre sedi). Classi permesse: "1AS", "2AS", "3AS", "4AS", "5AS", "1BS", "2BS", "3BS", "4BS", "5BS".
-           NOTA: Nel testo potrebbero essere scritte come "1A Liceo Siniscola", "2^ B Siniscola", "Classe 3AS", ecc. Riconoscile e normalizzale.
-           VIETATO ASSOLUTAMENTE: Se una riga riguarda QUALSIASI altra classe (es. 1A IPSASR, 2A IPSASR, 3A IPSASR) O qualsiasi classe del Liceo Scientifico di Dorgali o altre sedi, IGNORALA COMPLETAMENTE e NON includerla nell'array "eventi".`
+        6. FILTRO CLASSI - ESTRAI SOLO QUESTE 12 CLASSI:
+           - 4A IPSASR (qualsiasi sede)
+           - 5A IPSASR (qualsiasi sede)
+           - 1AS, 2AS, 3AS, 4AS, 5AS (Liceo Scientifico Siniscola)
+           - 1BS, 2BS, 3BS, 4BS, 5BS (Liceo Scientifico Siniscola)
+           NOTA: Nel testo le classi potrebbero essere scritte in vari modi: "4A", "4^ A", "Classe 4A", "4A IPSASR", "1A Liceo", "1AS", ecc. Riconoscile tutte e normalizzale.
+           ESCLUDI ASSOLUTAMENTE: 1A IPSASR, 2A IPSASR, 3A IPSASR, e qualsiasi classe del Liceo Scientifico di Dorgali o altre sedi diverse da Siniscola.`
       },
       {
         role: "user",
