@@ -41,7 +41,8 @@ export async function analyzeCircularText(text: string) {
         2. Normalizza gli orari: se trovi '17.00', convertilo in '17:00'.
         3. Copia l'ordine del giorno ESATTAMENTE come nel testo, dividendolo in un array di stringhe.
         4. Restituisci SOLO il JSON, senza markdown o testo aggiuntivo.
-        5. VIETATO usare abbreviazioni. Scrivi SEMPRE i nomi per esteso: usa "Consigli di Classe" (MAI "CDC"), "Collegio dei Docenti" (MAI "Collegio"), "Dipartimenti Disciplinari".`
+        5. VIETATO usare abbreviazioni. Scrivi SEMPRE i nomi per esteso: usa "Consigli di Classe" (MAI "CDC"), "Collegio dei Docenti" (MAI "Collegio"), "Dipartimenti Disciplinari".
+        6. FILTRO CLASSI OBBLIGATORIO: Estrai e crea eventi ESCLUSIVAMENTE per queste 12 classi: 5A IPSASR, 4A IPSASR, 1AS, 2AS, 3AS, 4AS, 5AS, 1BS, 2BS, 3BS, 4BS, 5BS (tutte del Liceo scientifico Siniscola). Se una riga della tabella riguarda un'altra classe, IGNORALA completamente e NON includerla nell'array "eventi".`
       },
       {
         role: "user",
