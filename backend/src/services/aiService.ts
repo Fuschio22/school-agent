@@ -24,7 +24,7 @@ export async function analyzeCircularText(text: string) {
           },
           "eventi": [
             {
-              "title": "string (es: 'Consiglio di Classe 4A IPSASR' o 'Consiglio di Classe 1AS')",
+              "title": "string (es: 'Consiglio di Classe 4A IPSASR' o 'Consiglio di Classe 1AS Siniscola')",
               "type": "string (es: 'Consigli di Classe')",
               "sede": "string",
               "data": "DD/MM/YYYY",
@@ -42,11 +42,11 @@ export async function analyzeCircularText(text: string) {
         3. Copia l'ordine del giorno ESATTAMENTE come nel testo, dividendolo in un array di stringhe.
         4. Restituisci SOLO il JSON, senza markdown o testo aggiuntivo.
         5. VIETATO usare abbreviazioni. Scrivi SEMPRE i nomi per esteso: usa "Consigli di Classe" (MAI "CDC"), "Collegio dei Docenti" (MAI "Collegio"), "Dipartimenti Disciplinari".
-        6. FILTRO CLASSI RIGOROSO: Crea eventi ESCLUSIVAMENTE per queste 12 classi: 
-           - IPSASR: "4A", "5A" 
-           - Liceo Scientifico: "1AS", "2AS", "3AS", "4AS", "5AS", "1BS", "2BS", "3BS", "4BS", "5BS".
-           NOTA: Nel testo potrebbero essere scritte come "1A Liceo", "2^ B", "Classe 3AS", ecc. Riconoscile e normalizzale come 1AS, 2BS, ecc. 
-           VIETATO: Se una riga riguarda QUALSIASI altra classe (es. 1A IPSASR, 2A IPSASR, 3A IPSASR, o classi di altri indirizzi), IGNORALA COMPLETAMENTE e NON includerla nell'array "eventi".`
+        6. FILTRO CLASSI E SEDI ULTRA-RIGOROSO: Crea eventi ESCLUSIVAMENTE per queste 12 classi in queste specifiche sedi:
+           - IPSASR (qualsiasi sede): SOLO "4A" e "5A"
+           - Liceo Scientifico: SOLO sede "Siniscola" (MAI Dorgali o altre sedi). Classi permesse: "1AS", "2AS", "3AS", "4AS", "5AS", "1BS", "2BS", "3BS", "4BS", "5BS".
+           NOTA: Nel testo potrebbero essere scritte come "1A Liceo Siniscola", "2^ B Siniscola", "Classe 3AS", ecc. Riconoscile e normalizzale.
+           VIETATO ASSOLUTAMENTE: Se una riga riguarda QUALSIASI altra classe (es. 1A IPSASR, 2A IPSASR, 3A IPSASR) O qualsiasi classe del Liceo Scientifico di Dorgali o altre sedi, IGNORALA COMPLETAMENTE e NON includerla nell'array "eventi".`
       },
       {
         role: "user",
