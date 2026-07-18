@@ -37,12 +37,14 @@ export async function analyzeCircularText(text: string) {
         }
 
         REGOLE FONDAMENTALI:
-        1. Crea UN evento per OGNI riga delle tabelle nel testo.
-        2. Normalizza gli orari: se trovi '17.00', convertilo in '17:00'.
-        3. Copia l'ordine del giorno ESATTAMENTE come nel testo, dividendolo in un array di stringhe.
-        4. Restituisci SOLO il JSON, senza markdown o testo aggiuntivo.
-        5. VIETATO usare abbreviazioni. Scrivi SEMPRE i nomi per esteso: usa "Consigli di Classe" (MAI "CDC"), "Collegio dei Docenti" (MAI "Collegio"), "Dipartimenti Disciplinari".
-        6. FILTRO CLASSI - INCLUDI SOLO QUESTE CLASSI (in qualsiasi forma siano scritte):
+        1. Crea UN evento SOLO per le righe che vedi EFFETTIVAMENTE nella tabella. NON inventare, NON dedurre, NON aggiungere classi che non sono scritte.
+        2. CALCOLO ORARIO DI FINE: Se la tabella mostra solo l'orario di inizio, calcola l'orario di fine basandoti sull'orario di inizio della riga successiva. Esempio: se 4^A inizia alle 18:45 e 4^B inizia alle 19:30, allora 4^A finisce alle 19:30.
+        3. Se non c'è una riga successiva, assumi una durata standard di 45 minuti (es: 18:45 → 19:30).
+        4. Normalizza gli orari: se trovi '17.00', convertilo in '17:00'.
+        5. Copia l'ordine del giorno ESATTAMENTE come nel testo, dividendolo in un array di stringhe.
+        6. Restituisci SOLO il JSON, senza markdown o testo aggiuntivo.
+        7. VIETATO usare abbreviazioni. Scrivi SEMPRE i nomi per esteso: usa "Consigli di Classe" (MAI "CDC"), "Collegio dei Docenti" (MAI "Collegio"), "Dipartimenti Disciplinari".
+        8. FILTRO CLASSI - INCLUDI SOLO QUESTE CLASSI (se presenti nella tabella):
            
            CLASSI PERMESSE (riconosci tutte le varianti):
            ✓ 4A IPSASR (anche scritta come: "4^ A IPSASR", "4 A IPSASR", "4A", "4^ A")
@@ -63,7 +65,7 @@ export async function analyzeCircularText(text: string) {
            ✗ Qualsiasi classe del Liceo Scientifico di Dorgali
            ✗ Qualsiasi altra classe non elencata sopra
            
-           Quando trovi una riga, chiediti: "Questa classe è nella lista PERMESSA?" Se SÌ, creala. Se NO, ignorala.`
+           IMPORTANTE: Se nella tabella NON vedi una classe (es. non vedi 5A), NON crearla. Crea eventi SOLO per le classi che sono effettivamente scritte nella tabella.`
       },
       {
         role: "user",
