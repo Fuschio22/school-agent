@@ -32,6 +32,7 @@ type MonthlyStats = {
   dipartimentiHours: number;
   gliHours: number;
   colloquiHours: number;
+  scrutiniHours: number;
   events: Event[];
 };
 
@@ -56,7 +57,6 @@ const calculateDurationHours = (startTime: string, endTime: string): number => {
 export default function Hours() {
   const [events, setEvents] = useState<Event[]>([]);
   const [loading, setLoading] = useState(true);
-  const [filterPeriod, setFilterPeriod] = useState<"all" | "month" | "trimester">("all");
   const [expandedMonth, setExpandedMonth] = useState<string | null>(null);
 
   useEffect(() => {
@@ -85,67 +85,76 @@ export default function Hours() {
     fetchData();
   }, []);
 
-  // Filtra eventi per periodo
-  const filteredEvents = events.filter(event => {
-    if (filterPeriod === "all") return true;
-    
-    const eventDate = new Date(event.date.split('/').reverse().join('-'));
-    const now = new Date();
-    
-    if (filterPeriod === "month") {
-      return eventDate.getMonth() === now.getMonth() && 
-             eventDate.getFullYear() === now.getFullYear();
-    }
-    
-    if (filterPeriod === "trimester") {
-      const threeMonthsAgo = new Date();
-      threeMonthsAgo.setMonth(now.getMonth() - 3);
-      return eventDate >= threeMonthsAgo;
-    }
-    
-    return true;
-  });
-
-  // Raggruppa eventi per mese
+  // Raggruppa eventi per mese (solo anno scolastico 2025/2026)
   const groupEventsByMonth = (): MonthlyStats[] => {
     const monthsMap: { [key: string]: MonthlyStats } = {};
     const monthNames = [
-      "Gennaio", "Febbraio", "Marzo", "Aprile", "Maggio", "Giugno",
-      "Luglio", "Agosto", "Settembre", "Ottobre", "Novembre", "Dicembre"
+      "Settembre", "Ottobre", "Novembre", "Dicembre", "Gennaio", "Febbraio",
+      "Marzo", "Aprile", "Maggio", "Giugno", "Luglio"
+    ];
+    
+    // Mesi dell'anno scolastico: Settembre 2025 - Luglio 2026
+    const schoolYearMonths = [
+      { month: "Settembre", year: "2025", monthNumber: 9 },
+      { month: "Ottobre", year: "2025", monthNumber: 10 },
+      { month: "Novembre", year: "2025", monthNumber: 11 },
+      { month: "Dicembre", year: "2025", monthNumber: 12 },
+      { month: "Gennaio", year: "2026", monthNumber: 1 },
+      { month: "Febbraio", year: "2026", monthNumber: 2 },
+      { month: "Marzo", year: "2026", monthNumber: 3 },
+      { month: "Aprile", year: "2026", monthNumber: 4 },
+      { month: "Maggio", year: "2026", monthNumber: 5 },
+      { month: "Giugno", year: "2026", monthNumber: 6 },
+      { month: "Luglio", year: "2026", monthNumber: 7 }
     ];
 
-    filteredEvents.forEach(event => {
+    // Inizializza tutti i mesi dell'anno scolastico
+    schoolYearMonths.forEach(({ month, year, monthNumber }) => {
+      const monthKey = `${year}-${String(monthNumber).padStart(2, '0')}`;
+      monthsMap[monthKey] = {
+        month,
+        year,
+        monthNumber,
+        totalHours: 0,
+        cdcHours: 0,
+        gloHours: 0,
+        collegiHours: 0,
+        dipartimentiHours: 0,
+        gliHours: 0,
+        colloquiHours: 0,
+        scrutiniHours: 0,
+        events: []
+      };
+    });
+
+    // Filtra solo eventi dell'anno scolastico 2025/2026
+    const schoolYearEvents = events.filter(event => {
       const [, month, year] = event.date.split('/');
-      const monthKey = `${year}-${month}`;
+      const eventDate = new Date(parseInt(year), parseInt(month) - 1);
+      const startDate = new Date(2025, 8, 1); // 1 Settembre 2025
+      const endDate = new Date(2026, 6, 31); // 31 Luglio 2026
+      return eventDate >= startDate && eventDate <= endDate;
+    });
+
+    schoolYearEvents.forEach(event => {
+      const [, month, year] = event.date.split('/');
+      const monthKey = `${year}-${month.padStart(2, '0')}`;
       
-      if (!monthsMap[monthKey]) {
-        monthsMap[monthKey] = {
-          month: monthNames[parseInt(month) - 1],
-          year: year,
-          monthNumber: parseInt(month),
-          totalHours: 0,
-          cdcHours: 0,
-          gloHours: 0,
-          collegiHours: 0,
-          dipartimentiHours: 0,
-          gliHours: 0,
-          colloquiHours: 0,
-          events: []
-        };
+      if (monthsMap[monthKey]) {
+        monthsMap[monthKey].events.push(event);
+        
+        // Calcola la durata reale dell'evento
+        const duration = calculateDurationHours(event.startTime, event.endTime);
+        monthsMap[monthKey].totalHours += duration;
+
+        if (event.type === "Consigli di Classe") monthsMap[monthKey].cdcHours += duration;
+        else if (event.type === "GLO") monthsMap[monthKey].gloHours += duration;
+        else if (event.type === "Collegio dei Docenti") monthsMap[monthKey].collegiHours += duration;
+        else if (event.type === "Dipartimenti Disciplinari") monthsMap[monthKey].dipartimentiHours += duration;
+        else if (event.type === "GLI") monthsMap[monthKey].gliHours += duration;
+        else if (event.type === "Colloqui Scuola-Famiglia") monthsMap[monthKey].colloquiHours += duration;
+        else if (event.type === "Scrutini" || event.type.includes("Scrutinio")) monthsMap[monthKey].scrutiniHours += duration;
       }
-
-      monthsMap[monthKey].events.push(event);
-      
-      // Calcola la durata reale dell'evento
-      const duration = calculateDurationHours(event.startTime, event.endTime);
-      monthsMap[monthKey].totalHours += duration;
-
-      if (event.type === "Consigli di Classe") monthsMap[monthKey].cdcHours += duration;
-      else if (event.type === "GLO") monthsMap[monthKey].gloHours += duration;
-      else if (event.type === "Collegio dei Docenti") monthsMap[monthKey].collegiHours += duration;
-      else if (event.type === "Dipartimenti Disciplinari") monthsMap[monthKey].dipartimentiHours += duration;
-      else if (event.type === "GLI") monthsMap[monthKey].gliHours += duration;
-      else if (event.type === "Colloqui Scuola-Famiglia") monthsMap[monthKey].colloquiHours += duration;
     });
 
     // Converti in array e ordina per data
@@ -160,23 +169,6 @@ export default function Hours() {
   
   // Calcola il totale ore
   const totalHours = monthlyStats.reduce((sum, month) => sum + month.totalHours, 0);
-
-  // Calcola ore per tipo (totale complessivo) - basato sulla durata reale
-  const cdcHours = filteredEvents
-    .filter(e => e.type === "Consigli di Classe")
-    .reduce((sum, e) => sum + calculateDurationHours(e.startTime, e.endTime), 0);
-  
-  const gloHours = filteredEvents
-    .filter(e => e.type === "GLO")
-    .reduce((sum, e) => sum + calculateDurationHours(e.startTime, e.endTime), 0);
-  
-  const collegiHours = filteredEvents
-    .filter(e => e.type === "Collegio dei Docenti")
-    .reduce((sum, e) => sum + calculateDurationHours(e.startTime, e.endTime), 0);
-  
-  const dipartimentiHours = filteredEvents
-    .filter(e => e.type === "Dipartimenti Disciplinari")
-    .reduce((sum, e) => sum + calculateDurationHours(e.startTime, e.endTime), 0);
 
   if (loading) {
     return (
@@ -220,92 +212,77 @@ export default function Hours() {
       <div>
         <h1 className="text-4xl font-bold">Registro Ore</h1>
         <p className="mt-2 text-slate-400">
-          Conteggio automatico di Consigli di Classe, Collegi Docenti, GLO, GLI, Dipartimenti e altre attività.
+          Anno Scolastico 2025/2026 - Conteggio automatico delle attività
         </p>
-      </div>
-
-      {/* Filtro Periodo */}
-      <div className="flex gap-3">
-        <button
-          onClick={() => setFilterPeriod("all")}
-          className={`px-4 py-2 rounded-lg font-semibold transition-all ${
-            filterPeriod === "all" 
-              ? "bg-blue-600 text-white" 
-              : "bg-slate-800 text-slate-400 hover:bg-slate-700"
-          }`}
-        >
-          Tutto
-        </button>
-        <button
-          onClick={() => setFilterPeriod("month")}
-          className={`px-4 py-2 rounded-lg font-semibold transition-all ${
-            filterPeriod === "month" 
-              ? "bg-blue-600 text-white" 
-              : "bg-slate-800 text-slate-400 hover:bg-slate-700"
-          }`}
-        >
-          Questo Mese
-        </button>
-        <button
-          onClick={() => setFilterPeriod("trimester")}
-          className={`px-4 py-2 rounded-lg font-semibold transition-all ${
-            filterPeriod === "trimester" 
-              ? "bg-blue-600 text-white" 
-              : "bg-slate-800 text-slate-400 hover:bg-slate-700"
-          }`}
-        >
-          Ultimi 3 Mesi
-        </button>
       </div>
 
       {/* Totale Ore */}
       <div className="rounded-2xl bg-slate-900 p-6 border border-slate-800">
-        <h2 className="text-2xl font-semibold mb-4">Totale Ore</h2>
+        <h2 className="text-2xl font-semibold mb-4">Totale Ore Anno Scolastico</h2>
         <div className="text-6xl font-bold text-blue-400">{formatHours(totalHours)}</div>
-        <p className="text-slate-400 mt-2">ore totali nel periodo selezionato</p>
+        <p className="text-slate-400 mt-2">dal 1 Settembre 2025 al 31 Luglio 2026</p>
       </div>
 
-      {/* Riepilogo Mensile Dettagliato */}
+      {/* Riepilogo Mensile - Anno Scolastico Completo */}
       <div className="rounded-2xl bg-slate-900 p-6 border border-slate-800">
         <h2 className="text-2xl font-semibold mb-4">📊 Riepilogo Mensile</h2>
-        <div className="space-y-3">
+        <div className="space-y-2">
           {monthlyStats.map((monthStat) => {
             const monthKey = `${monthStat.month}-${monthStat.year}`;
             const isExpanded = expandedMonth === monthKey;
             const cdcGloHours = monthStat.cdcHours + monthStat.gloHours;
             const collegiDipHours = monthStat.collegiHours + monthStat.dipartimentiHours;
+            const hasEvents = monthStat.events.length > 0;
 
             return (
               <div key={monthKey} className="border border-slate-800 rounded-lg overflow-hidden">
                 {/* Header del mese - sempre visibile */}
                 <div 
-                  className="p-4 bg-slate-800/50 hover:bg-slate-800 cursor-pointer transition-colors flex items-center justify-between"
-                  onClick={() => setExpandedMonth(isExpanded ? null : monthKey)}
+                  className={`p-4 hover:bg-slate-800 transition-colors ${hasEvents ? 'cursor-pointer' : 'cursor-default'}`}
+                  onClick={() => hasEvents && setExpandedMonth(isExpanded ? null : monthKey)}
                 >
-                  <div className="flex items-center gap-4">
-                    <h3 className="text-xl font-bold text-white capitalize">
-                      {monthStat.month} {monthStat.year}
-                    </h3>
-                    <span className="text-2xl font-bold text-blue-400">
-                      {formatHours(monthStat.totalHours)}
-                    </span>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-4">
+                      <h3 className={`text-lg font-bold capitalize ${hasEvents ? 'text-white' : 'text-slate-500'}`}>
+                        {monthStat.month} {monthStat.year}
+                      </h3>
+                      {hasEvents ? (
+                        <span className="text-2xl font-bold text-blue-400">
+                          {formatHours(monthStat.totalHours)}
+                        </span>
+                      ) : (
+                        <span className="text-sm text-slate-500 italic">Nessun evento</span>
+                      )}
+                    </div>
+                    {hasEvents && (
+                      <div className="flex items-center gap-3">
+                        <span className="text-xs text-slate-400 hidden lg:block">
+                          CDC+GLO: <span className="text-blue-400 font-semibold">{formatHours(cdcGloHours)}</span> | 
+                          Collegi+Dip: <span className="text-green-400 font-semibold">{formatHours(collegiDipHours)}</span>
+                          {monthStat.colloquiHours > 0 && ` | Colloqui: ${formatHours(monthStat.colloquiHours)}`}
+                          {monthStat.scrutiniHours > 0 && ` | Scrutini: ${formatHours(monthStat.scrutiniHours)}`}
+                        </span>
+                        <span className="text-slate-400">
+                          {isExpanded ? "▲" : "▼"}
+                        </span>
+                      </div>
+                    )}
                   </div>
-                  <div className="flex items-center gap-3">
-                    <span className="text-sm text-slate-400">
-                      CDC+GLO: <span className="text-blue-400 font-semibold">{formatHours(cdcGloHours)}</span> | 
-                      Collegi+Dip: <span className="text-green-400 font-semibold">{formatHours(collegiDipHours)}</span>
-                    </span>
-                    <span className="text-slate-400">
-                      {isExpanded ? "▲" : "▼"}
-                    </span>
-                  </div>
+                  
+                  {/* Riepilogo compatto per mobile */}
+                  {hasEvents && (
+                    <div className="mt-2 text-xs text-slate-400 lg:hidden">
+                      CDC+GLO: <span className="text-blue-400">{formatHours(cdcGloHours)}</span> | 
+                      Collegi+Dip: <span className="text-green-400">{formatHours(collegiDipHours)}</span>
+                    </div>
+                  )}
                 </div>
 
                 {/* Dettagli espandibili */}
-                {isExpanded && (
+                {isExpanded && hasEvents && (
                   <div className="p-4 bg-slate-950/30 border-t border-slate-800">
                     {/* Card per tipo di evento */}
-                    <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3 mb-4">
+                    <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-4 mb-4">
                       {monthStat.cdcHours > 0 && (
                         <div className="p-3 bg-blue-900/20 rounded-lg border border-blue-600/30">
                           <p className="text-sm text-blue-300">Consigli di Classe</p>
@@ -340,6 +317,12 @@ export default function Hours() {
                         <div className="p-3 bg-pink-900/20 rounded-lg border border-pink-600/30">
                           <p className="text-sm text-pink-300">Colloqui</p>
                           <p className="text-2xl font-bold text-pink-400">{formatHours(monthStat.colloquiHours)}</p>
+                        </div>
+                      )}
+                      {monthStat.scrutiniHours > 0 && (
+                        <div className="p-3 bg-red-900/20 rounded-lg border border-red-600/30">
+                          <p className="text-sm text-red-300">Scrutini</p>
+                          <p className="text-2xl font-bold text-red-400">{formatHours(monthStat.scrutiniHours)}</p>
                         </div>
                       )}
                     </div>
@@ -400,36 +383,6 @@ export default function Hours() {
               </div>
             );
           })}
-        </div>
-      </div>
-
-      {/* Riepilogo per Tipo (Totale Complessivo) */}
-      <div className="rounded-2xl bg-slate-900 p-6 border border-slate-800">
-        <h2 className="text-2xl font-semibold mb-4">Ore per Tipo di Evento (Totale)</h2>
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          <div className="p-4 bg-slate-800 rounded-lg border border-slate-700">
-            <h3 className="font-semibold text-white mb-2">Consigli di Classe</h3>
-            <p className="text-3xl font-bold text-blue-400">{formatHours(cdcHours)}</p>
-            <p className="text-sm text-slate-400">ore</p>
-          </div>
-
-          <div className="p-4 bg-slate-800 rounded-lg border border-slate-700">
-            <h3 className="font-semibold text-white mb-2">GLO</h3>
-            <p className="text-3xl font-bold text-purple-400">{formatHours(gloHours)}</p>
-            <p className="text-sm text-slate-400">ore</p>
-          </div>
-
-          <div className="p-4 bg-slate-800 rounded-lg border border-slate-700">
-            <h3 className="font-semibold text-white mb-2">Collegio dei Docenti</h3>
-            <p className="text-3xl font-bold text-green-400">{formatHours(collegiHours)}</p>
-            <p className="text-sm text-slate-400">ore</p>
-          </div>
-
-          <div className="p-4 bg-slate-800 rounded-lg border border-slate-700">
-            <h3 className="font-semibold text-white mb-2">Dipartimenti</h3>
-            <p className="text-3xl font-bold text-orange-400">{formatHours(dipartimentiHours)}</p>
-            <p className="text-sm text-slate-400">ore</p>
-          </div>
         </div>
       </div>
     </div>
