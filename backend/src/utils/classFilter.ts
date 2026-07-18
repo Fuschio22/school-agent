@@ -4,7 +4,7 @@ const ALLOWED_CLASSES = [
   "1BS", "2BS", "3BS", "4BS", "5BS"
 ];
 
-const FORBIDDEN_SEDES = ["DORGALI", "ITTL", "I.T.T.L.", "TECNICO"];
+const FORBIDDEN_SEDES = ["DORGALI", "ITTL", "I.T.T.L.", "TECNICO", "TRASPORTI E LOGISTICA"];
 
 // Eventi SEMPRE permessi (non legati a classi specifiche)
 const ALWAYS_ALLOWED_EVENTS = [
@@ -13,7 +13,10 @@ const ALWAYS_ALLOWED_EVENTS = [
   "COLLEGIO DOCENTI",
   "CONVOCAZIONE DEI DIPARTIMENTI",
   "DIPARTIMENTI",
-  "CONVOCAZIONE DIPARTIMENTI"
+  "CONVOCAZIONE DIPARTIMENTI",
+  "COLLOQUI SCUOLA-FAMIGLIA",
+  "COLLOQUI SCUOLA FAMIGLIA",
+  "COLLOQUI"
 ];
 
 export function shouldIncludeEvent(event: {
@@ -28,9 +31,27 @@ export function shouldIncludeEvent(event: {
   const type = (event.type || "").toUpperCase();
   const combinedText = `${title} ${type} ${classe} ${sede}`.toUpperCase();
 
-  // 1. EVENTI SEMPRE PERMESSI (Collegio, Dipartimenti, ecc.)
+  // 1. EVENTI SEMPRE PERMESSI (Collegio, Dipartimenti, Colloqui, ecc.)
   for (const allowedEvent of ALWAYS_ALLOWED_EVENTS) {
     if (title.includes(allowedEvent) || type.includes(allowedEvent)) {
+      // Controllo aggiuntivo: se è un colloquio, verifica che non sia ITTL o Dorgali
+      if (allowedEvent.includes("COLLOQUI")) {
+        if (title.includes("ITTL") || title.includes("DORGALI") || 
+            sede.includes("DORGALI") || sede.includes("ITTL")) {
+          console.log(`❌ Bloccato colloquio (sede non permessa):`, combinedText);
+          return false;
+        }
+        // Permetti solo Siniscola e IPSASR
+        if (title.includes("LICEO SCIENTIFICO") && sede.includes("SINISCOLA")) {
+          console.log(`✅ Permesso evento generale (${allowedEvent} - Liceo Siniscola):`, combinedText);
+          return true;
+        }
+        if (title.includes("ISTITUTO PROFESSIONALE") || title.includes("IPSASR") || title.includes("AGRICOLTURA")) {
+          console.log(`✅ Permesso evento generale (${allowedEvent} - IPSASR):`, combinedText);
+          return true;
+        }
+      }
+      
       console.log(`✅ Permesso evento generale (${allowedEvent}):`, combinedText);
       return true;
     }
@@ -63,7 +84,7 @@ export function shouldIncludeEvent(event: {
   }
 
   // 4. Controllo per classi IPSASR
-  const isIPSASR = sede.includes("IPSASR") || title.includes("IPSASR");
+  const isIPSASR = sede.includes("IPSASR") || title.includes("IPSASR") || title.includes("AGRICOLTURA");
   
   if (isIPSASR) {
     const classMatch = classe.match(/(\d+)\^?\s*([A-B])/) || title.match(/(\d+)\^?\s*([A-B])/);
