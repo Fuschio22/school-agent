@@ -36,14 +36,26 @@ export async function analyzeCircularText(text: string) {
           "ordineDelGiorno": ["array di stringhe"]
         }
 
-        REGOLE FONDAMENTALI:
+        REGOLE FONDAMENTALI - LEGGI ATTENTAMENTE:
         
-        1. EVITA DUPLICATI - REGOLA D'ORO:
-           - Se la circolare convoca UN SOLO evento (es: "I Dipartimenti sono convocati il giorno X alle ore Y"), crea UN SOLO evento
-           - NON creare eventi multipli per la stessa data/orario anche se ci sono sedi nominate diverse
-           - Se vedi "Sede centrale" e il nome completo dell'istituto, sono la STESSA sede → crea UN evento
+        1. QUANDO CREARE EVENTI:
+           ✅ Crea eventi SOLO quando vedi CONVOCAZIONI ESPLICITE con:
+              - Data specifica (es: "il giorno giovedì 23 ottobre 2025")
+              - Orario specifico (es: "alle ore 15:30" o "dalle ore 15:30 alle ore 17:30")
+              - Luogo specifico (es: "presso l'Aula Magna")
            
-        2. ESTRATTORI DI EVENTI - DUE METODI:
+           ❌ NON creare eventi da:
+              - Frasi come "a conclusione seguiranno...", "seguiranno i Dipartimenti"
+              - Note informative o promemoria
+              - Riferimenti generici senza data/orario specifici
+              - Esempio: "Si ricorda che a conclusione del Collegio seguiranno i Dipartimenti" → NON creare evento!
+        
+        2. EVITA DUPLICATI - REGOLA D'ORO:
+           - Se la circolare convoca UN SOLO evento, crea UN SOLO evento
+           - NON creare eventi multipli per la stessa data/orario
+           - Se vedi "Sede centrale" e il nome completo dell'istituto, sono la STESSA sede → UN evento
+        
+        3. ESTRATTORI DI EVENTI - DUE METODI:
            
            METODO A - TABELLE:
            - Se ci sono tabelle nel testo, crea UN evento per OGNI riga
@@ -52,32 +64,32 @@ export async function analyzeCircularText(text: string) {
              → IGNORA: ITTL, Liceo Dorgali
            
            METODO B - TESTO DESCRITTIVO:
-           - Se NON ci sono tabelle ma il testo contiene convocazioni, estrai dal testo
-           - Cerca frasi come: "convocati il giorno X alle ore Y", "dalle ore X alle ore Y"
+           - Se NON ci sono tabelle ma il testo contiene CONVOCAZIONI ESPLICITE, estrai dal testo
+           - Cerca frasi come: "è convocato il giorno X alle ore Y", "dalle ore X alle ore Y"
            - Estrai data, orario e sede
            - Crea UN SOLO evento per ogni convocazione distinta
         
-        3. COLLOQUI SCUOLA-FAMIGLIA - INDIRIZZI PERMESSI:
+        4. COLLOQUI SCUOLA-FAMIGLIA - INDIRIZZI PERMESSI:
            ✓ "Liceo Scientifico di Siniscola" → crea evento
            ✓ "Istituto Professionale per l'Agricoltura" → crea evento
-           ✗ "Istituto Tecnico Trasporti e Logistica" → IGNORA
+            "Istituto Tecnico Trasporti e Logistica" → IGNORA
            ✗ "Liceo Scientifico di Dorgali" → IGNORA
         
-        4. NORMALIZZA LE CLASSI:
+        5. NORMALIZZA LE CLASSI:
            - "1^A" → "1A"
            - "4^A" → "4A"
            - Rimuovi il simbolo "^"
         
-        5. ORARI:
+        6. ORARI:
            - Se vedi "Dalle ore 15:00 alle ore 18:00" → usa entrambi
            - Se vedi solo inizio, calcola fine (+1 ora o dalla riga successiva)
            - NON invertire mai gli orari: oraInizio deve essere SEMPRE < oraFine
         
-        6. USA NOMI COMPLETI:
+        7. USA NOMI COMPLETI:
            - Type: "Dipartimenti Disciplinari", "Consigli di Classe", "Collegio dei Docenti", "GLO"
            - Sede: Scrivi SEMPRE la sede completa
         
-        7. Restituisci SOLO JSON, niente markdown o testo aggiuntivo`
+        8. Restituisci SOLO JSON, niente markdown o testo aggiuntivo`
       },
       {
         role: "user",
