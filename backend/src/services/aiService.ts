@@ -38,22 +38,26 @@ export async function analyzeCircularText(text: string) {
 
         REGOLE FONDAMENTALI - SEGUI QUESTO ORDINE:
         
-        REGOLA 1 - CLASSI VIETATE (LEGGI PRIMA DI TUTTO):
+        REGOLA 1 - ISTITUTI E CLASSI VIETATE (LEGGI PRIMA DI TUTTO):
+        ✗ NON creare MAI eventi per ITTL (Istituto Tecnico Tecnologico Logistico) o qualsiasi classe ITTL
         ✗ NON creare MAI eventi per: 1A IPSASR, 2A IPSASR, 3A IPSASR, 3B IPSASR
         ✗ NON creare MAI eventi per classi del Liceo Scientifico di Dorgali
+        ✗ NON creare MAI eventi per qualsiasi altro istituto non elencato nelle classi permesse
         ✗ Se vedi una di queste classi nella tabella, IGNORALA COMPLETAMENTE. Non creare l'evento.
         
-        REGOLA 2 - CLASSI PERMESSE (SOLO QUESTE):
+        REGOLA 2 - CLASSI PERMESSE (SOLO QUESTE 12 CLASSI):
         ✓ Crea eventi SOLO per queste classi (se presenti nella tabella):
           - 4A IPSASR (anche scritta come: "4^ A", "4 A IPSASR", "4A")
           - 5A IPSASR (anche scritta come: "5^ A", "5 A IPSASR", "5A")
           - 1AS, 2AS, 3AS, 4AS, 5AS (Liceo Scientifico Siniscola)
           - 1BS, 2BS, 3BS, 4BS, 5BS (Liceo Scientifico Siniscola)
         
-        REGOLA 3 - PRIMA DI CREARE UN EVENTO:
-        Per ogni riga della tabella, chiediti: "Questa classe è 4A IPSASR, 5A IPSASR, o una classe del Liceo Siniscola (1AS-5AS, 1BS-5BS)?"
-        - Se SÌ → crea l'evento
-        - Se NO → IGNORA la riga, non creare nulla
+        REGOLA 3 - PRIMA DI CREARE UN EVENTO (CONTROLLA OBBLIGATORIO):
+        Per ogni riga della tabella, chiediti:
+        1. "Questa classe è ITTL?" → Se SÌ, IGNORA
+        2. "Questa classe è 1A, 2A, 3A, 3B IPSASR?" → Se SÌ, IGNORA
+        3. "Questa classe è 4A IPSASR, 5A IPSASR, o una classe del Liceo Siniscola (1AS-5AS, 1BS-5BS)?" → Se SÌ, crea l'evento
+        4. Se non è nessuna di queste → IGNORA la riga
         
         REGOLA 4 - CALCOLO ORARIO:
         - Se la tabella mostra solo l'orario di inizio, calcola l'orario di fine basandoti sulla riga successiva
