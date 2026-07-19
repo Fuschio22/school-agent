@@ -24,8 +24,8 @@ export async function analyzeCircularText(text: string) {
           },
           "eventi": [
             {
-              "title": "string (es: 'Scrutini 1^A Liceo Scientifico Siniscola' o 'Scrutini 4A IPSASR')",
-              "type": "string (es: 'Scrutini', 'Consigli di Classe Straordinari', 'Dipartimenti Disciplinari', 'Consigli di Classe', 'Collegio dei Docenti')",
+              "title": "string (es: 'Scrutini Finali 5A Liceo Scientifico Siniscola' o 'Scrutini 4A IPSASR')",
+              "type": "string (es: 'Scrutini Finali', 'Scrutini', 'Consigli di Classe Straordinari', 'Dipartimenti Disciplinari', 'Consigli di Classe', 'Collegio dei Docenti')",
               "sede": "string (DEVE contenere l'istituto completo)",
               "data": "DD/MM/YYYY",
               "oraInizio": "HH:MM",
@@ -44,8 +44,8 @@ export async function analyzeCircularText(text: string) {
               Esempi:
               - Se la circolare convoca un Collegio → oggetto: "Convocazione Collegio dei Docenti"
               - Se convoca Dipartimenti → oggetto: "Convocazione Dipartimenti Disciplinari"
-              - Se convoca Consigli di Classe → oggetto: "Convocazione Consigli di Classe"
-              - Se è una rettifica → oggetto: "Rettifica [tipo evento]"
+              - Se convoca Consigli di Classe o Scrutini → oggetto: "Convocazione Scrutini Finali"
+              - Se è una rettifica o calendario definitivo → oggetto: "Calendario definitivo Scrutini"
            ❌ MAI lasciare l'oggetto vuoto o "N/D"
         
         2. QUANDO CREARE EVENTI:
@@ -53,7 +53,7 @@ export async function analyzeCircularText(text: string) {
               - Data specifica (es: "il giorno martedì 09 settembre 2025" o "martedì 10 febbraio")
               - Orario specifico (es: "alle ore 15:00" o "dalle ore 09:00 alle ore 10:30")
               - Luogo specifico (es: "presso l'Aula Magna")
-              - Include anche: Consigli di Classe Straordinari, Collegi Straordinari, sedute straordinarie, SCRUTINI
+              - Include anche: Consigli di Classe Straordinari, Collegi Straordinari, sedute straordinarie, SCRUTINI, SCRUTINI FINALI
            
            ❌ NON creare eventi da:
               - Frasi come "a conclusione seguiranno...", "seguiranno i Dipartimenti"
@@ -69,7 +69,7 @@ export async function analyzeCircularText(text: string) {
            
            METODO A - TABELLE:
            - Se ci sono tabelle nel testo, crea UN evento per OGNI riga
-           - Per COLLOQUI SCUOLA-FAMIGLIA, COLLEGI DI PLESSO e SCRUTINI: quando vedi colonne "Istituto/Sede", "Data", "Ora", "Luogo"
+           - Per COLLOQUI SCUOLA-FAMIGLIA, COLLEGI DI PLESSO, SCRUTINI e SCRUTINI FINALI: quando vedi colonne "Istituto/Sede", "Data", "Ora", "Luogo"
              → Crea evento SOLO per: Liceo Scientifico Siniscola, IPSASR (o Istituto Professionale per l'Agricoltura)
              → IGNORA COMPLETAMENTE: ITTL (Istituto Tecnico Trasporti e Logistica), Liceo Scientifico Dorgali
            
@@ -80,13 +80,13 @@ export async function analyzeCircularText(text: string) {
            - Estrai data, orario e sede
            - Crea UN SOLO evento per ogni convocazione distinta
         
-        5. SCRUTINI - REGOLA SPECIALE:
-           ✅ Quando vedi tabelle con "Scrutini" o "Consigli di classe per SCRUTINI":
-              - type: "Scrutini" (NON "Consigli di Classe")
-              - title: "Scrutini [classe] [istituto]" (es: "Scrutini 1A Liceo Scientifico Siniscola")
-              - classe: normalizza "1^A" → "1A", "2^B" → "2B"
-              - Per Liceo Scientifico: aggiungi "S" alla sezione (1A → 1AS, 2B → 2BS)
-              - Per IPSASR: mantieni formato "1A IPSASR", "2A IPSASR"
+        5. SCRUTINI E SCRUTINI FINALI - REGOLA SPECIALE:
+           ✅ Quando vedi tabelle con "Scrutini" o "Scrutini Finali":
+              - type: "Scrutini Finali" o "Scrutini" (NON "Consigli di Classe")
+              - title: "Scrutini Finali [classe] [istituto]" (es: "Scrutini Finali 5A Liceo Scientifico Siniscola")
+              - classe: normalizza "1^A" → "1A", "2^B" → "2B", "5^A" → "5A"
+              - Per Liceo Scientifico: aggiungi "S" alla sezione (1A → 1AS, 2B → 2BS, 5A → 5AS)
+              - Per IPSASR: mantieni formato "1A IPSASR", "5A IPSASR"
               - data: dalla riga di intestazione della sezione (es: "Lunedì 02 febbraio 2026" → "02/02/2026")
               - oraInizio/oraFine: dalla colonna orario (es: "14.30 – 15.00" → "14:30" e "15:00")
            
@@ -117,7 +117,7 @@ export async function analyzeCircularText(text: string) {
            - NON invertire mai gli orari: oraInizio deve essere SEMPRE < oraFine
         
         9. USA NOMI COMPLETI:
-           - Type: "Scrutini", "Consigli di Classe Straordinari", "Consigli di Classe", "Dipartimenti Disciplinari", 
+           - Type: "Scrutini Finali", "Scrutini", "Consigli di Classe Straordinari", "Consigli di Classe", "Dipartimenti Disciplinari", 
              "Collegio dei Docenti", "Collegio di Plesso", "GLO"
            - Sede: Scrivi SEMPRE la sede completa
         

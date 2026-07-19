@@ -25,13 +25,20 @@ function extractMonthYear(text: string): { month: string; year: string } | null 
   return null;
 }
 
-// Funzione per verificare se è una rettifica
+// Funzione per verificare se è una rettifica (AMPLIATA per includere calendari definitivi)
 function isRettifica(text: string): boolean {
   const lowerText = text.toLowerCase();
   return lowerText.includes("rettifica") || 
          lowerText.includes("modifica") || 
          lowerText.includes("variazione") ||
-         lowerText.includes("aggiornamento");
+         lowerText.includes("aggiornamento") ||
+         lowerText.includes("calendario definitivo") ||
+         lowerText.includes("calendario aggiornato") ||
+         lowerText.includes("nuovo calendario") ||
+         lowerText.includes("calendarizzazione definitiva") ||
+         lowerText.includes("integrazione") ||
+         lowerText.includes("sostituisce") ||
+         lowerText.includes("annulla e sostituisce");
 }
 
 // Funzione 1: Analizza e salva (o aggiorna) una circolare
@@ -85,13 +92,14 @@ export const analyzeCircularController = async (req: Request, res: Response) => 
       if (monthYear) {
         console.log(`🔍 Cerco eventi da sostituire per: ${monthYear.month} ${monthYear.year}`);
         
-        // Cerca tutte le circolari che hanno eventi nello stesso mese/anno
+        // Cerca tutte le circolari che hanno eventi nello stesso mese/anno (aggiunto "Scrutini" alla ricerca)
         const similarCirculars = await prisma.circular.findMany({
           include: { events: true },
           where: {
             OR: [
               { subject: { contains: monthYear.month, mode: 'insensitive' } },
-              { subject: { contains: "Consigli di Classe", mode: 'insensitive' } }
+              { subject: { contains: "Consigli di Classe", mode: 'insensitive' } },
+              { subject: { contains: "Scrutini", mode: 'insensitive' } }
             ]
           }
         });
@@ -204,7 +212,7 @@ export const analyzeCircularController = async (req: Request, res: Response) => 
       include: { events: true },
     });
 
-    console.log(`✅ Circolare ${rettifica ? 'RETTIFICA' : 'SALVATA'} con successo nel DB. ID:`, circular.id);
+    console.log(`✅ Circolare ${rettifica ? 'RETTIFICA (sostituisce vecchie)' : 'SALVATA'} con successo nel DB. ID:`, circular.id);
     res.json(circular);
   } catch (error) {
     console.error("❌ Errore analisi circolare:", error);
@@ -254,7 +262,7 @@ export const deleteCircularController = async (req: Request, res: Response) => {
     console.log(`✅ Circolare eliminata con successo. ID: ${id}`);
     res.json({ message: "Circolare eliminata con successo" });
   } catch (error) {
-    console.error(" Errore nell'eliminazione della circolare:", error);
+    console.error("❌ Errore nell'eliminazione della circolare:", error);
     res.status(500).json({ error: "Errore durante l'eliminazione della circolare" });
   }
 };
