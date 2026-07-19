@@ -22,7 +22,8 @@ const ALWAYS_ALLOWED_EVENTS = [
   "CONSIGLI DI CLASSE",
   "CONSIGLIO DI CLASSE",
   "CONSIGLI DI CLASSE STRAORDINARI",
-  "CONSIGLIO DI CLASSE STRAORDINARIO"
+  "CONSIGLIO DI CLASSE STRAORDINARIO",
+  "SCRUTINI"
 ];
 
 export function shouldIncludeEvent(event: {
@@ -37,12 +38,12 @@ export function shouldIncludeEvent(event: {
   const type = (event.type || "").toUpperCase();
   const combinedText = `${title} ${type} ${classe} ${sede}`.toUpperCase();
 
-  // 1. EVENTI SEMPRE PERMESSI (Collegio, Dipartimenti, Colloqui, Collegi di Plesso, Consigli di Classe, ecc.)
+  // 1. EVENTI SEMPRE PERMESSI (Collegio, Dipartimenti, Colloqui, Collegi di Plesso, Consigli di Classe, Scrutini, ecc.)
   for (const allowedEvent of ALWAYS_ALLOWED_EVENTS) {
     if (title.includes(allowedEvent) || type.includes(allowedEvent)) {
       
-      // Controllo aggiuntivo: se è un colloquio o un collegio di plesso, verifica che non sia ITTL o Dorgali
-      if (allowedEvent.includes("COLLOQUI") || allowedEvent.includes("PLESSO")) {
+      // Controllo aggiuntivo: se è un colloquio, collegio di plesso o scrutinio, verifica che non sia ITTL o Dorgali
+      if (allowedEvent.includes("COLLOQUI") || allowedEvent.includes("PLESSO") || allowedEvent.includes("SCRUTINI")) {
         if (title.includes("ITTL") || title.includes("DORGALI") || title.includes("TRASPORTI") ||
             sede.includes("DORGALI") || sede.includes("ITTL")) {
           console.log(`❌ Bloccato evento generale (sede non permessa: Dorgali/ITTL):`, combinedText);

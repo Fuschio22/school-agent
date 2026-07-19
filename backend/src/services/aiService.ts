@@ -24,13 +24,13 @@ export async function analyzeCircularText(text: string) {
           },
           "eventi": [
             {
-              "title": "string (es: 'Consiglio di Classe Straordinario 5A Liceo Scientifico Siniscola' o 'Consiglio di Classe 4A IPSASR')",
-              "type": "string (es: 'Consigli di Classe Straordinari', 'Dipartimenti Disciplinari', 'Consigli di Classe', 'Collegio dei Docenti')",
+              "title": "string (es: 'Scrutini 1^A Liceo Scientifico Siniscola' o 'Scrutini 4A IPSASR')",
+              "type": "string (es: 'Scrutini', 'Consigli di Classe Straordinari', 'Dipartimenti Disciplinari', 'Consigli di Classe', 'Collegio dei Docenti')",
               "sede": "string (DEVE contenere l'istituto completo)",
               "data": "DD/MM/YYYY",
               "oraInizio": "HH:MM",
               "oraFine": "HH:MM",
-              "classe": "string (es: '5A', '4A', vuoto se evento generale)"
+              "classe": "string (es: '1A', '4A', vuoto se evento generale)"
             }
           ],
           "ordineDelGiorno": ["array di stringhe"]
@@ -53,7 +53,7 @@ export async function analyzeCircularText(text: string) {
               - Data specifica (es: "il giorno martedì 09 settembre 2025" o "martedì 10 febbraio")
               - Orario specifico (es: "alle ore 15:00" o "dalle ore 09:00 alle ore 10:30")
               - Luogo specifico (es: "presso l'Aula Magna")
-              - Include anche: Consigli di Classe Straordinari, Collegi Straordinari, sedute straordinarie
+              - Include anche: Consigli di Classe Straordinari, Collegi Straordinari, sedute straordinarie, SCRUTINI
            
            ❌ NON creare eventi da:
               - Frasi come "a conclusione seguiranno...", "seguiranno i Dipartimenti"
@@ -69,40 +69,59 @@ export async function analyzeCircularText(text: string) {
            
            METODO A - TABELLE:
            - Se ci sono tabelle nel testo, crea UN evento per OGNI riga
-           - Per COLLOQUI SCUOLA-FAMIGLIA e COLLEGI DI PLESSO: quando vedi colonne "Istituto/Sede", "Data", "Ora", "Luogo"
+           - Per COLLOQUI SCUOLA-FAMIGLIA, COLLEGI DI PLESSO e SCRUTINI: quando vedi colonne "Istituto/Sede", "Data", "Ora", "Luogo"
              → Crea evento SOLO per: Liceo Scientifico Siniscola, IPSASR (o Istituto Professionale per l'Agricoltura)
              → IGNORA COMPLETAMENTE: ITTL (Istituto Tecnico Trasporti e Logistica), Liceo Scientifico Dorgali
            
            METODO B - TESTO DESCRITTIVO:
            - Se NON ci sono tabelle ma il testo contiene CONVOCAZIONI ESPLICITE, estrai dal testo
            - Cerca frasi come: "è convocato il giorno X alle ore Y", "dalle ore X alle ore Y", 
-             "Consiglio di Classe Straordinario", "seduta straordinaria"
+             "Consiglio di Classe Straordinario", "seduta straordinaria", "Scrutini"
            - Estrai data, orario e sede
            - Crea UN SOLO evento per ogni convocazione distinta
         
-        5. COLLEGI DI PLESSO E COLLOQUI - INDIRIZZI PERMESSI:
+        5. SCRUTINI - REGOLA SPECIALE:
+           ✅ Quando vedi tabelle con "Scrutini" o "Consigli di classe per SCRUTINI":
+              - type: "Scrutini" (NON "Consigli di Classe")
+              - title: "Scrutini [classe] [istituto]" (es: "Scrutini 1A Liceo Scientifico Siniscola")
+              - classe: normalizza "1^A" → "1A", "2^B" → "2B"
+              - Per Liceo Scientifico: aggiungi "S" alla sezione (1A → 1AS, 2B → 2BS)
+              - Per IPSASR: mantieni formato "1A IPSASR", "2A IPSASR"
+              - data: dalla riga di intestazione della sezione (es: "Lunedì 02 febbraio 2026" → "02/02/2026")
+              - oraInizio/oraFine: dalla colonna orario (es: "14.30 – 15.00" → "14:30" e "15:00")
+           
+           ✅ INDIRIZZI PERMESSI per Scrutini:
+              - "Liceo Scientifico di Siniscola" → crea evento
+              - "Istituto Professionale per l'Agricoltura" (o IPSASR) → crea evento
+              - ✗ "Istituto Tecnico Trasporti e Logistica" (o ITTL) → IGNORA
+              - ✗ "Liceo Scientifico di Dorgali" → IGNORA
+        
+        6. COLLEGI DI PLESSO E COLLOQUI - INDIRIZZI PERMESSI:
            ✓ "Liceo Scientifico di Siniscola" → crea evento
            ✓ "Istituto Professionale per l'Agricoltura" (o IPSASR) → crea evento
            ✗ "Istituto Tecnico Trasporti e Logistica" (o ITTL) → IGNORA
            ✗ "Liceo Scientifico di Dorgali" → IGNORA
         
-        6. NORMALIZZA LE CLASSI:
+        7. NORMALIZZA LE CLASSI:
            - "1^A" → "1A"
            - "4^A" → "4A"
            - "5^A" → "5A"
            - Rimuovi il simbolo "^"
+           - Per Liceo Scientifico: aggiungi "S" alla sezione (1A → 1AS, 2B → 2BS)
+           - Per IPSASR: mantieni formato "1A IPSASR", "2A IPSASR"
         
-        7. ORARI:
+        8. ORARI:
            - Se vedi "Dalle ore 15:00 alle ore 18:00" → usa entrambi
+           - Se vedi "14.30 – 15.00" → converti in "14:30" e "15:00"
            - Se vedi solo inizio, calcola fine (+1 ora o dalla riga successiva, o come specificato nel testo "durata 1 ora")
            - NON invertire mai gli orari: oraInizio deve essere SEMPRE < oraFine
         
-        8. USA NOMI COMPLETI:
-           - Type: "Consigli di Classe Straordinari", "Consigli di Classe", "Dipartimenti Disciplinari", 
+        9. USA NOMI COMPLETI:
+           - Type: "Scrutini", "Consigli di Classe Straordinari", "Consigli di Classe", "Dipartimenti Disciplinari", 
              "Collegio dei Docenti", "Collegio di Plesso", "GLO"
            - Sede: Scrivi SEMPRE la sede completa
         
-        9. Restituisci SOLO JSON, niente markdown o testo aggiuntivo`
+        10. Restituisci SOLO JSON, niente markdown o testo aggiuntivo`
       },
       {
         role: "user",
