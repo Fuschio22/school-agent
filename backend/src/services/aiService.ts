@@ -24,13 +24,13 @@ export async function analyzeCircularText(text: string) {
           },
           "eventi": [
             {
-              "title": "string (es: 'Colloqui Scuola-Famiglia Liceo Scientifico Siniscola' o 'Consiglio di Classe 1AS')",
-              "type": "string (es: 'Colloqui Scuola-Famiglia', 'Consigli di Classe', 'Scrutini', 'Collegio dei Docenti')",
-              "sede": "string (Nome completo dell'istituto)",
+              "title": "string (es: 'Colloqui Scuola-Famiglia Liceo Scientifico Siniscola')",
+              "type": "string (es: 'Colloqui Scuola-Famiglia', 'Consigli di Classe', 'Scrutini')",
+              "sede": "string (Nome COMPLETO dell'istituto, es: 'Istituto Professionale per l'Agricoltura')",
               "data": "DD/MM/YYYY",
               "oraInizio": "HH:MM",
               "oraFine": "HH:MM",
-              "classe": "string (es: '1AS', '4A IPSASR', o 'Tutte' se evento generale)"
+              "classe": "string (es: '1AS', 'Tutte' se evento generale)"
             }
           ],
           "ordineDelGiorno": ["array di stringhe"]
@@ -38,15 +38,14 @@ export async function analyzeCircularText(text: string) {
 
         REGOLE FONDAMENTALI:
 
-        1. ORDINE DEL GIORNO (ODG):
-           ✅ Cerca elenchi numerati (1., 2., 3.) ed estraili tutti nell'array "ordineDelGiorno".
+        1. ORDINE DEL GIORNO: Estrai tutti i punti numerati nell'array "ordineDelGiorno".
 
-        2. ESTRAZIONE DA TABELLE - REGOLA BRUTALE:
+        2. ESTRAZIONE DA TABELLE - REGOLA D'ORO:
            ✅ LEGGI la tabella dall'INIZIO ALLA FINE, riga per riga.
-           ✅ Se la circolare riguarda i COLLOQUI e la tabella elenca solo "Istituto", "Data" e "Ora" (senza classi specifiche), crea COMUNQUE un evento distinto per ogni riga/istituto.
-           ✅ NON saltare nessuna sezione. Leggi IPSASR, ITTL, Liceo Scientifico, Dorgali.
-           ✅ Per ogni riga, estrai: Classe (o 'Tutte'), Data, Ora, Luogo/Sede.
-           ✅ Nel JSON finale, includi eventi per "Liceo Scientifico Siniscola" e "IPSASR". Escludi ITTL e Dorgali.
+           ✅ Crea UN evento per OGNI SINGOLA RIGA della tabella.
+           ✅ NON saltare nessuna riga, anche se contiene ITTL o Dorgali.
+           ✅ Estrai il nome dell'istituto ESATTAMENTE come scritto nella tabella.
+           ✅ Se la riga non specifica classi, usa "classe": "Tutte".
 
         3. NORMALIZZAZIONE CLASSI:
            - Rimuovi "^" (es: "1^A" → "1A").
@@ -64,9 +63,6 @@ export async function analyzeCircularText(text: string) {
   });
 
   const content = response.choices[0]?.message?.content || "{}";
-  
-  // 🔍 DEBUG: Stampiamo il JSON grezzo per vedere COSA HA ESTRATTO L'AI
   console.log("🤖 RAW AI JSON OUTPUT:", content);
-
   return JSON.parse(content);
 }
