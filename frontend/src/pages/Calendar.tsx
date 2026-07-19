@@ -17,7 +17,7 @@ export default function Calendar() {
   const [events, setEvents] = useState<Event[]>([]);
   const [currentDate, setCurrentDate] = useState(new Date());
   const [loading, setLoading] = useState(true);
-  const [selectedDay, setSelectedDay] = useState<number | null>(null); // <-- NUOVO: giorno selezionato
+  const [selectedDay, setSelectedDay] = useState<number | null>(null);
 
   useEffect(() => {
     const fetchEvents = async () => {
@@ -61,10 +61,13 @@ export default function Calendar() {
     const month = currentDate.getMonth() + 1;
     const dateStr = `${String(day).padStart(2, '0')}/${String(month).padStart(2, '0')}/${year}`;
     
-    return events.filter(event => {
+    const dayEvents = events.filter(event => {
       const eventDate = event.date.replace(/-/g, '/');
       return eventDate === dateStr || eventDate === `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
     });
+    
+    // <-- AGGIUNTO: Ordina gli eventi per orario (startTime)
+    return dayEvents.sort((a, b) => a.startTime.localeCompare(b.startTime));
   };
 
   const { daysInMonth, startingDayOfWeek } = getDaysInMonth(currentDate);
@@ -103,8 +106,8 @@ export default function Calendar() {
   }
 
   const selectedDayEvents = selectedDay 
-  ? getEventsForDate(selectedDay).sort((a, b) => a.startTime.localeCompare(b.startTime))
-  : [];
+    ? getEventsForDate(selectedDay)
+    : [];
 
   return (
     <div className="p-8 relative">
@@ -214,7 +217,7 @@ export default function Calendar() {
         >
           <div 
             className="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-2xl max-h-[85vh] overflow-y-auto shadow-2xl"
-            onClick={(e) => e.stopPropagation()} // Previene la chiusura cliccando dentro il modale
+            onClick={(e) => e.stopPropagation()}
           >
             {/* Header del modale */}
             <div className="p-6 border-b border-slate-800 flex justify-between items-center sticky top-0 bg-slate-900 z-10">
@@ -245,7 +248,7 @@ export default function Calendar() {
                     
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-slate-300 mt-4">
                       <div className="flex items-start gap-3">
-                        <span className="text-xl">🕒</span>
+                        <span className="text-xl"></span>
                         <div>
                           <p className="text-slate-400 text-xs uppercase tracking-wider">Orario</p>
                           <p className="font-semibold text-white">{event.startTime} - {event.endTime}</p>
