@@ -1,6 +1,8 @@
 const FORBIDDEN_SEDES = ["DORGALI", "ITTL", "I.T.T.L.", "TECNICO", "TRASPORTI E LOGISTICA"];
 
 // Eventi SEMPRE permessi (non legati a classi specifiche)
+// ⚠️ RIMOSSI: "CONSIGLI DI CLASSE", "CONSIGLIO DI CLASSE", "CONSIGLI DI CLASSE STRAORDINARI", "CONSIGLIO DI CLASSE STRAORDINARIO"
+// Perché i Consigli di Classe sono legati a classi specifiche e devono essere filtrati!
 const ALWAYS_ALLOWED_EVENTS = [
   "COLLEGIO DEI DOCENTI",
   "DIPARTIMENTI DISCIPLINARI",
@@ -13,10 +15,6 @@ const ALWAYS_ALLOWED_EVENTS = [
   "COLLOQUI",
   "COLLEGIO DI PLESSO",
   "COLLEGI DI PLESSO",
-  "CONSIGLI DI CLASSE",
-  "CONSIGLIO DI CLASSE",
-  "CONSIGLI DI CLASSE STRAORDINARI",
-  "CONSIGLIO DI CLASSE STRAORDINARIO",
   "SCRUTINI",
   "SCRUTINI FINALI"
 ];
@@ -26,7 +24,7 @@ export function shouldIncludeEvent(event: {
   type?: string;
   sede?: string;
   classe?: string;
-}, userClasses: string[]): boolean { // <-- AGGIUNTO: riceve le classi dalle Impostazioni
+}, userClasses: string[]): boolean {
   const title = (event.title || "").toUpperCase();
   const sede = (event.sede || "").toUpperCase();
   const classe = (event.classe || "").toUpperCase();
@@ -118,7 +116,6 @@ export function shouldIncludeEvent(event: {
   return false;
 }
 
-// ✅ AGGIORNATO: Ora accetta userClasses come secondo parametro
 export function filterEvents(events: any[], userClasses: string[]): any[] {
   return events.filter(event => shouldIncludeEvent(event, userClasses));
-}
+} 
