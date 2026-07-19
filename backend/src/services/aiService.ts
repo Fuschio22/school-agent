@@ -7,7 +7,7 @@ export async function analyzeCircularText(text: string) {
   });
 
   const response = await openai.chat.completions.create({
-    model: "llama-3.3-70b-versatile",
+    model: "llama-3.1-8b-instant", // <-- CAMBIATO QUI: più veloce e senza limiti stringenti
     messages: [
       {
         role: "system",
