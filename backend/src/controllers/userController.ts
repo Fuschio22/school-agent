@@ -4,7 +4,6 @@ import { prisma } from "../lib/prisma";
 // Funzione per ottenere le classi dell'utente
 export const getUserClassesController = async (req: Request, res: Response) => {
   try {
-    // Usiamo l'utente demo (in futuro qui ci sarà l'autenticazione reale)
     const userEmail = "demo@schoolagent.it";
     
     const user = await prisma.user.findUnique({
@@ -16,9 +15,8 @@ export const getUserClassesController = async (req: Request, res: Response) => {
       return res.status(404).json({ error: "Utente non trovato" });
     }
 
-    // Il campo è salvato come stringa JSON, lo convertiamo in array
-    const classesArray = user.classes ? JSON.parse(user.classes) : [];
-    res.json({ classes: classesArray });
+    // Prisma gestisce nativamente String[], quindi user.classes è già un array!
+    res.json({ classes: user.classes || [] });
   } catch (error) {
     console.error("❌ Errore recupero classi:", error);
     res.status(500).json({ error: "Errore durante il recupero delle classi" });
@@ -39,13 +37,13 @@ export const updateUserClassesController = async (req: Request, res: Response) =
     const user = await prisma.user.update({
       where: { email: userEmail },
       data: {
-        classes: JSON.stringify(classes), // Salviamo l'array come stringa JSON
+        classes: classes, // Prisma accetta direttamente l'array di stringhe, niente JSON.stringify
       },
     });
 
     res.json({ 
       message: "Classi aggiornate con successo", 
-      classes: JSON.parse(user.classes) 
+      classes: user.classes 
     });
   } catch (error) {
     console.error("❌ Errore aggiornamento classi:", error);

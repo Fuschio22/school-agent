@@ -59,7 +59,7 @@ export const analyzeCircularController = async (req: Request, res: Response) => 
     let user = await prisma.user.findUnique({ where: { email: "demo@schoolagent.it" } });
     if (!user) {
       user = await prisma.user.create({
-        data: { email: "demo@schoolagent.it", name: "Utente Demo" }
+        data: { email: "demo@schoolagent.it", name: "Utente Demo", classes: [] }
       });
     }
 
@@ -69,8 +69,12 @@ export const analyzeCircularController = async (req: Request, res: Response) => 
       : (Array.isArray(analysis.consigliDiClasse) ? analysis.consigliDiClasse : []);
     const orderOfDay = Array.isArray(analysis.ordineDelGiorno) ? analysis.ordineDelGiorno : [];
 
-    // Applichiamo il filtro di sicurezza
-    const filteredEventsData = filterEvents(eventsData);
+    // 🌟 NUOVO: Recupera le classi configurate dall'utente nelle Impostazioni
+    const userClasses = user.classes || [];
+    console.log(`👤 Classi configurate dall'utente:`, userClasses);
+
+    // 🌟 NUOVO: Applichiamo il filtro passando le classi dinamiche dell'utente
+    const filteredEventsData = filterEvents(eventsData, userClasses);
     console.log(`🔍 Filtro applicato: da ${eventsData.length} eventi estratti a ${filteredEventsData.length} eventi permessi.`);
 
     const numeroCircolare = String(circData.numero || "");
@@ -92,7 +96,7 @@ export const analyzeCircularController = async (req: Request, res: Response) => 
       if (monthYear) {
         console.log(`🔍 Cerco eventi da sostituire per: ${monthYear.month} ${monthYear.year}`);
         
-        // Cerca tutte le circolari che hanno eventi nello stesso mese/anno (aggiunto "Scrutini" alla ricerca)
+        // Cerca tutte le circolari che hanno eventi nello stesso mese/anno
         const similarCirculars = await prisma.circular.findMany({
           include: { events: true },
           where: {

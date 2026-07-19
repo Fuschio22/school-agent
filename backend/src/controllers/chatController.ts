@@ -30,7 +30,7 @@ export const chatController = async (req: Request, res: Response) => {
         orario: `${e.startTime} - ${e.endTime}`,
         sede: e.location
       })),
-      ordineDelGiorno: circ.summary.split("\n")
+      ordineDelGiorno: circ.summary ? circ.summary.split("\n") : []
     }));
 
     // 3. Configura Groq
