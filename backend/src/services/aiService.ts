@@ -24,13 +24,13 @@ export async function analyzeCircularText(text: string) {
           },
           "eventi": [
             {
-              "title": "string (es: 'Collegio di Plesso Liceo Scientifico Siniscola' o 'Consiglio di Classe 4A IPSASR')",
-              "type": "string (es: 'Collegio di Plesso', 'Dipartimenti Disciplinari', 'Consigli di Classe', 'Collegio dei Docenti')",
+              "title": "string (es: 'Consiglio di Classe Straordinario 5A Liceo Scientifico Siniscola' o 'Consiglio di Classe 4A IPSASR')",
+              "type": "string (es: 'Consigli di Classe Straordinari', 'Dipartimenti Disciplinari', 'Consigli di Classe', 'Collegio dei Docenti')",
               "sede": "string (DEVE contenere l'istituto completo)",
               "data": "DD/MM/YYYY",
               "oraInizio": "HH:MM",
               "oraFine": "HH:MM",
-              "classe": "string (vuoto se evento generale)"
+              "classe": "string (es: '5A', '4A', vuoto se evento generale)"
             }
           ],
           "ordineDelGiorno": ["array di stringhe"]
@@ -50,9 +50,10 @@ export async function analyzeCircularText(text: string) {
         
         2. QUANDO CREARE EVENTI:
            ✅ Crea eventi SOLO quando vedi CONVOCAZIONI ESPLICITE con:
-              - Data specifica (es: "il giorno martedì 09 settembre 2025")
-              - Orario specifico (es: "dalle ore 09:00 alle ore 10:30")
+              - Data specifica (es: "il giorno martedì 09 settembre 2025" o "martedì 10 febbraio")
+              - Orario specifico (es: "alle ore 15:00" o "dalle ore 09:00 alle ore 10:30")
               - Luogo specifico (es: "presso l'Aula Magna")
+              - Include anche: Consigli di Classe Straordinari, Collegi Straordinari, sedute straordinarie
            
            ❌ NON creare eventi da:
               - Frasi come "a conclusione seguiranno...", "seguiranno i Dipartimenti"
@@ -74,7 +75,8 @@ export async function analyzeCircularText(text: string) {
            
            METODO B - TESTO DESCRITTIVO:
            - Se NON ci sono tabelle ma il testo contiene CONVOCAZIONI ESPLICITE, estrai dal testo
-           - Cerca frasi come: "è convocato il giorno X alle ore Y", "dalle ore X alle ore Y"
+           - Cerca frasi come: "è convocato il giorno X alle ore Y", "dalle ore X alle ore Y", 
+             "Consiglio di Classe Straordinario", "seduta straordinaria"
            - Estrai data, orario e sede
            - Crea UN SOLO evento per ogni convocazione distinta
         
@@ -87,6 +89,7 @@ export async function analyzeCircularText(text: string) {
         6. NORMALIZZA LE CLASSI:
            - "1^A" → "1A"
            - "4^A" → "4A"
+           - "5^A" → "5A"
            - Rimuovi il simbolo "^"
         
         7. ORARI:
@@ -95,7 +98,8 @@ export async function analyzeCircularText(text: string) {
            - NON invertire mai gli orari: oraInizio deve essere SEMPRE < oraFine
         
         8. USA NOMI COMPLETI:
-           - Type: "Collegio di Plesso", "Dipartimenti Disciplinari", "Consigli di Classe", "Collegio dei Docenti", "GLO"
+           - Type: "Consigli di Classe Straordinari", "Consigli di Classe", "Dipartimenti Disciplinari", 
+             "Collegio dei Docenti", "Collegio di Plesso", "GLO"
            - Sede: Scrivi SEMPRE la sede completa
         
         9. Restituisci SOLO JSON, niente markdown o testo aggiuntivo`
