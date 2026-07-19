@@ -85,7 +85,7 @@ export default function Circulars() {
 
   const handleDeleteCircular = async (id: string, numero: string) => {
     const confirmed = window.confirm(
-      `⚠️ Sei sicuro di voler eliminare la Circolare n. ${numero}?\n\nQuesta azione eliminerà anche tutti gli eventi associati e non potrà essere annullata.`
+      `️ Sei sicuro di voler eliminare la Circolare n. ${numero}?\n\nQuesta azione eliminerà anche tutti gli eventi associati e non potrà essere annullata.`
     );
 
     if (!confirmed) return;
@@ -164,15 +164,16 @@ export default function Circulars() {
 
   return (
     <div className="space-y-8 max-w-7xl mx-auto">
-      {/* BARRA STICKY: Titolo + Ricerca - rimane fissa quando scorri */}
-      <div className="sticky top-0 z-20 bg-slate-950 border-b border-slate-800 px-6 py-4 shadow-lg">
-        <div className="flex justify-between items-center max-w-7xl mx-auto">
+      {/* BARRA STICKY: Titolo + Ricerca + Upload - rimane fissa quando scorri */}
+      <div className="sticky top-0 z-20 bg-slate-950 border-b border-slate-800 shadow-lg">
+        {/* Riga 1: Titolo e Ricerca */}
+        <div className="flex justify-between items-center px-6 py-4 border-b border-slate-800">
           <h1 className="text-2xl font-bold text-white">Gestione Circolari</h1>
           
           <div className="relative w-96">
             <input
               type="text"
-              placeholder=" Cerca per numero, oggetto, data..."
+              placeholder="🔍 Cerca per numero, oggetto, data..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full px-4 py-2 pl-10 pr-4 text-sm border border-slate-600 bg-slate-800 text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent placeholder-slate-400"
@@ -200,12 +201,10 @@ export default function Circulars() {
             )}
           </div>
         </div>
-      </div>
 
-      {/* Contenuto scrollabile */}
-      <div className="p-6 space-y-8">
-        <div className="bg-white shadow-sm border border-gray-200 rounded-lg p-6">
-          <h2 className="text-lg font-semibold mb-4 text-gray-800">Carica Nuova Circolare</h2>
+        {/* Riga 2: Carica Nuova Circolare */}
+        <div className="px-6 py-4 bg-slate-900">
+          <h2 className="text-lg font-semibold mb-3 text-white">Carica Nuova Circolare</h2>
           <label className="block">
             <span className="sr-only">Scegli un file PDF</span>
             <input
@@ -213,11 +212,14 @@ export default function Circulars() {
               accept=".pdf"
               onChange={handleFileChange}
               disabled={isProcessing || loading}
-              className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer disabled:opacity-50"
+              className="block w-full text-sm text-slate-400 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-600 file:text-white hover:file:bg-blue-700 cursor-pointer disabled:opacity-50"
             />
           </label>
         </div>
+      </div>
 
+      {/* Contenuto scrollabile */}
+      <div className="p-6 space-y-8">
         {(error || processError) && (
           <div className="bg-red-50 border-l-4 border-red-500 text-red-700 p-4 rounded">
             <p className="font-bold">Errore</p>
@@ -289,14 +291,14 @@ export default function Circulars() {
                         📄 PDF
                       </button>
                       <button onClick={() => handleDownloadICS(circ)} className="text-xs bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-md transition-colors font-medium">
-                        📥 .ics
+                         .ics
                       </button>
                     </div>
                   </div>
 
                   <div className="mt-4 pt-4 border-t border-gray-200 bg-white p-4 rounded-lg border border-gray-100">
                     <h4 className="text-sm font-bold text-blue-900 mb-3 flex items-center gap-2">
-                      <span></span> Ordine del Giorno
+                      <span>📋</span> Ordine del Giorno
                     </h4>
                     <div className="mb-6">
                       {renderNumberedSummary(circ.summary)}
@@ -305,7 +307,7 @@ export default function Circulars() {
                     {circ.events && circ.events.length > 0 && (
                       <>
                         <h4 className="text-sm font-bold text-blue-900 mb-3 flex items-center gap-2">
-                          <span>📅</span> Calendario Eventi ({circ.events.length})
+                          <span></span> Calendario Eventi ({circ.events.length})
                         </h4>
                         <VisualCalendar events={circ.events} />
                       </>
