@@ -24,8 +24,8 @@ export async function analyzeCircularText(text: string) {
           },
           "eventi": [
             {
-              "title": "string (es: 'Dipartimenti Disciplinari' o 'Consiglio di Classe 4A IPSASR')",
-              "type": "string (es: 'Dipartimenti Disciplinari', 'Consigli di Classe', 'Collegio dei Docenti')",
+              "title": "string (es: 'Collegio di Plesso Liceo Scientifico Siniscola' o 'Consiglio di Classe 4A IPSASR')",
+              "type": "string (es: 'Collegio di Plesso', 'Dipartimenti Disciplinari', 'Consigli di Classe', 'Collegio dei Docenti')",
               "sede": "string (DEVE contenere l'istituto completo)",
               "data": "DD/MM/YYYY",
               "oraInizio": "HH:MM",
@@ -68,9 +68,9 @@ export async function analyzeCircularText(text: string) {
            
            METODO A - TABELLE:
            - Se ci sono tabelle nel testo, crea UN evento per OGNI riga
-           - Per COLLOQUI SCUOLA-FAMIGLIA: quando vedi colonne "Indirizzo di studio", "Data", "Orario", "Luogo"
-             → Crea evento per: Liceo Scientifico Siniscola, IPSASR
-             → IGNORA: ITTL, Liceo Dorgali
+           - Per COLLOQUI SCUOLA-FAMIGLIA e COLLEGI DI PLESSO: quando vedi colonne "Istituto/Sede", "Data", "Ora", "Luogo"
+             → Crea evento SOLO per: Liceo Scientifico Siniscola, IPSASR (o Istituto Professionale per l'Agricoltura)
+             → IGNORA COMPLETAMENTE: ITTL (Istituto Tecnico Trasporti e Logistica), Liceo Scientifico Dorgali
            
            METODO B - TESTO DESCRITTIVO:
            - Se NON ci sono tabelle ma il testo contiene CONVOCAZIONI ESPLICITE, estrai dal testo
@@ -78,10 +78,10 @@ export async function analyzeCircularText(text: string) {
            - Estrai data, orario e sede
            - Crea UN SOLO evento per ogni convocazione distinta
         
-        5. COLLOQUI SCUOLA-FAMIGLIA - INDIRIZZI PERMESSI:
+        5. COLLEGI DI PLESSO E COLLOQUI - INDIRIZZI PERMESSI:
            ✓ "Liceo Scientifico di Siniscola" → crea evento
-           ✓ "Istituto Professionale per l'Agricoltura" → crea evento
-            "Istituto Tecnico Trasporti e Logistica" → IGNORA
+           ✓ "Istituto Professionale per l'Agricoltura" (o IPSASR) → crea evento
+           ✗ "Istituto Tecnico Trasporti e Logistica" (o ITTL) → IGNORA
            ✗ "Liceo Scientifico di Dorgali" → IGNORA
         
         6. NORMALIZZA LE CLASSI:
@@ -91,11 +91,11 @@ export async function analyzeCircularText(text: string) {
         
         7. ORARI:
            - Se vedi "Dalle ore 15:00 alle ore 18:00" → usa entrambi
-           - Se vedi solo inizio, calcola fine (+1 ora o dalla riga successiva)
+           - Se vedi solo inizio, calcola fine (+1 ora o dalla riga successiva, o come specificato nel testo "durata 1 ora")
            - NON invertire mai gli orari: oraInizio deve essere SEMPRE < oraFine
         
         8. USA NOMI COMPLETI:
-           - Type: "Dipartimenti Disciplinari", "Consigli di Classe", "Collegio dei Docenti", "GLO"
+           - Type: "Collegio di Plesso", "Dipartimenti Disciplinari", "Consigli di Classe", "Collegio dei Docenti", "GLO"
            - Sede: Scrivi SEMPRE la sede completa
         
         9. Restituisci SOLO JSON, niente markdown o testo aggiuntivo`

@@ -16,7 +16,9 @@ const ALWAYS_ALLOWED_EVENTS = [
   "CONVOCAZIONE DIPARTIMENTI",
   "COLLOQUI SCUOLA-FAMIGLIA",
   "COLLOQUI SCUOLA FAMIGLIA",
-  "COLLOQUI"
+  "COLLOQUI",
+  "COLLEGIO DI PLESSO",
+  "COLLEGI DI PLESSO"
 ];
 
 export function shouldIncludeEvent(event: {
@@ -31,14 +33,15 @@ export function shouldIncludeEvent(event: {
   const type = (event.type || "").toUpperCase();
   const combinedText = `${title} ${type} ${classe} ${sede}`.toUpperCase();
 
-  // 1. EVENTI SEMPRE PERMESSI (Collegio, Dipartimenti, Colloqui, ecc.)
+  // 1. EVENTI SEMPRE PERMESSI (Collegio, Dipartimenti, Colloqui, Collegi di Plesso, ecc.)
   for (const allowedEvent of ALWAYS_ALLOWED_EVENTS) {
     if (title.includes(allowedEvent) || type.includes(allowedEvent)) {
-      // Controllo aggiuntivo: se è un colloquio, verifica che non sia ITTL o Dorgali
-      if (allowedEvent.includes("COLLOQUI")) {
-        if (title.includes("ITTL") || title.includes("DORGALI") || 
+      
+      // Controllo aggiuntivo: se è un colloquio o un collegio di plesso, verifica che non sia ITTL o Dorgali
+      if (allowedEvent.includes("COLLOQUI") || allowedEvent.includes("PLESSO")) {
+        if (title.includes("ITTL") || title.includes("DORGALI") || title.includes("TRASPORTI") ||
             sede.includes("DORGALI") || sede.includes("ITTL")) {
-          console.log(`❌ Bloccato colloquio (sede non permessa):`, combinedText);
+          console.log(`❌ Bloccato evento generale (sede non permessa: Dorgali/ITTL):`, combinedText);
           return false;
         }
         // Permetti solo Siniscola e IPSASR
