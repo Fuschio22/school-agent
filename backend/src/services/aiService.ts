@@ -19,7 +19,7 @@ export async function analyzeCircularText(text: string) {
           "circolare": {
             "numero": "string",
             "data": "string",
-            "oggetto": "string (Copia ESATTAMENTE il testo dopo 'OGGETTO:')",
+            "oggetto": "string (Copia SOLO il testo dopo 'OGGETTO:' fino al punto fermo)",
             "destinatari": ["array di stringhe"]
           },
           "eventi": [
@@ -33,33 +33,27 @@ export async function analyzeCircularText(text: string) {
               "classe": "string (es: '1AS', '4A IPSASR')"
             }
           ],
-          "ordineDelGiorno": ["array di stringhe"]
+          "ordineDelGiorno": ["array di stringhe - estrai i punti numerati 1., 2., 3., ecc."]
         }
 
-        REGOLE FONDAMENTALI - SEGUI ALLA LETTERA:
+        REGOLE FONDAMENTALI:
 
-        1. ORDINE DEL GIORNO (ODG) - PRIORITÀ ASSOLUTA:
-           ✅ Cerca nel testo una sezione chiamata "Ordine del Giorno", "ODG" o un elenco numerato (1., 2., 3., ecc.).
-           ✅ Estrai OGNI punto dell'elenco e mettilo come stringa separata nell'array "ordineDelGiorno".
-           ❌ NON lasciare mai questo array vuoto se nel testo c'è un elenco.
+        1. OGGETTO: Copia solo il testo breve dopo "OGGETTO:", NON includere tutto il contenuto della circolare.
 
-        2. ESTRAZIONE DA TABELLE - REGOLA BRUTALE:
-           ✅ Se nel testo c'è una tabella o un elenco strutturato, DEVI leggere e processare OGNI SINGOLA RIGA, dall'inizio alla fine.
-           ✅ NON saltare nessuna sezione (in particolare, NON ignorare la parte relativa al "Liceo Scientifico").
-           ✅ Per ogni riga, estrai: Classe, Data, Ora, Luogo/Sede.
-           ✅ FILTRA DOPO: Nel JSON finale, includi SOLO gli eventi per "Liceo Scientifico Siniscola" e "IPSASR". 
-           ✅ Escludi dal JSON finale qualsiasi evento per "ITTL", "Istituto Tecnico Trasporti e Logistica", "Liceo Scientifico Dorgali".
+        2. ORDINE DEL GIORNO: Cerca punti numerati (1., 2., 3.) ed estraili in un array.
 
-        3. NORMALIZZAZIONE CLASSI (FONDAMENTALE):
-           - Rimuovi sempre il simbolo "^" (es: "1^A" diventa "1A").
-           - Se la classe è del Liceo Scientifico, nel campo "classe" AGGIUNGI "S" alla lettera (es: "1A" → "1AS", "2B" → "2BS", "5A" → "5AS").
-           - Se la classe è IPSASR, mantieni il formato "1A IPSASR", "4A IPSASR", ecc.
+        3. TABELLE - ISTRUZIONE CRITICA:
+           ✅ LEGGI la tabella dall'INIZIO ALLA FINE, riga per riga.
+           ✅ NON fermarti dopo la prima sezione (es. IPSASR). CONTINUA a leggere anche le sezioni successive (Liceo Scientifico, ITTL, ecc.).
+           ✅ Per OGNI riga con una classe, data e orario, crea un evento separato.
+           ✅ Alla fine, FILTRA: tieni SOLO "Liceo Scientifico Siniscola" e "IPSASR". Scarta ITTL e Dorgali.
 
-        4. TIPO EVENTO:
-           - Usa "Consigli di Classe" se la circolare parla di Consigli di Classe.
-           - Usa "Scrutini" o "Scrutini Finali" solo se la circolare parla esplicitamente di Scrutini.
+        4. NORMALIZZAZIONE:
+           - Rimuovi "^" dalle classi (es: "1^A" → "1A")
+           - Per il Liceo Scientifico, aggiungi "S" (es: "1A" → "1AS", "2B" → "2BS")
+           - Per IPSASR, mantieni "1A IPSASR", "4A IPSASR"
 
-        5. Restituisci SOLO JSON valido. Niente markdown, niente testo prima o dopo le parentesi graffe.`
+        5. Restituisci SOLO JSON valido. Verifica che tutte le parentesi siano chiuse correttamente.`
       },
       {
         role: "user",
@@ -70,9 +64,5 @@ export async function analyzeCircularText(text: string) {
   });
 
   const content = response.choices[0]?.message?.content || "{}";
-  
-  // 🔧 NUOVO: Stampiamo il JSON grezzo per vedere COSA HA ESTRATTO L'AI PRIMA DEL FILTRO
-  console.log("🤖 RAW AI JSON OUTPUT:", content);
-
   return JSON.parse(content);
 }
