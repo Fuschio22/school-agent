@@ -46,7 +46,7 @@ export const chatController = async (req: Request, res: Response) => {
       filters.push("consigli", "consiglio", "glo", "gruppo", "collegio", "dipartiment", "scrutini", "riceviment");
     }
 
-    console.log(`🔍 Filtri applicati: ${filters.join(", ")}`);
+    console.log(` Filtri applicati: ${filters.join(", ")}`);
 
     const filteredEvents = allEvents.filter(e => {
       const typeLower = (e.type || "").toLowerCase();
@@ -98,6 +98,16 @@ export const chatController = async (req: Request, res: Response) => {
 
       console.log(`📊 Eventi nel periodo: ${finalEvents.length}`);
     }
+
+    // ✅ ORDINAMENTO CRONOLOGICO (dal più vecchio al più recente)
+    finalEvents.sort((a, b) => {
+      if (!a.date || !b.date) return 0;
+      const [dA, mA, yA] = a.date.split('/').map(Number);
+      const [dB, mB, yB] = b.date.split('/').map(Number);
+      const dateA = new Date(yA, mA - 1, dA);
+      const dateB = new Date(yB, mB - 1, dB);
+      return dateA.getTime() - dateB.getTime();
+    });
 
     // 4. CALCOLO PRECISO DELLE ORE NEL BACKEND
     let totalMinutes = 0;
