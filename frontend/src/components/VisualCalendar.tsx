@@ -26,24 +26,20 @@ export default function VisualCalendar({ events }: VisualCalendarProps) {
     }
   }, [events]);
 
-  // 🎹 Gestione tasto ESC per chiudere il pannello dettagli
+  // 🎹 Gestione tasto ESC
   useEffect(() => {
-    const handleEsc = (event: KeyboardEvent) => {
-      if (event.key === 'Escape' || event.key === 'Esc') {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
         setSelectedDate(null);
       }
     };
+
+    window.addEventListener('keydown', handleKeyDown);
     
-    // Aggiungi l'ascoltatore solo quando il pannello è aperto
-    if (selectedDate) {
-      document.addEventListener('keydown', handleEsc);
-    }
-    
-    // Rimuovi l'ascoltatore quando il componente si smonta o selectedDate cambia
     return () => {
-      document.removeEventListener('keydown', handleEsc);
+      window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [selectedDate]);
+  }, []); // Array vuoto = si esegue una volta sola al mount
 
   const year = currentDate.getFullYear();
   const month = currentDate.getMonth();
