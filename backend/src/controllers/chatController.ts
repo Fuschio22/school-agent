@@ -9,22 +9,21 @@ export const chatController = async (req: Request, res: Response) => {
     const { message } = req.body;
     const messageLower = message.toLowerCase();
     
-    // 1. Recuperiamo gli eventi dal database
     const circulars = await prisma.circular.findMany({
       include: { events: true }
     });
 
     const allEvents = circulars.flatMap(c => c.events);
-    console.log(`📊 Eventi totali nel DB: ${allEvents.length}`);
+    console.log(` Eventi totali nel DB: ${allEvents.length}`);
 
-    // 2. FILTRAGGIO DETERMINISTICO NEL BACKEND
+    // ✅ FIX: uso "consig" per matchare sia "consiglio" che "consigli"
     const filters: string[] = [];
     
-    if (messageLower.includes("consiglio") || messageLower.includes("cdc")) {
+    if (messageLower.includes("consig") || messageLower.includes("cdc")) {
       filters.push("consigli");
       filters.push("consiglio");
     }
-    if (messageLower.includes("glo") || messageLower.includes("gruppo di lavoro")) {
+    if (messageLower.includes("glo") || messageLower.includes("gruppo")) {
       filters.push("glo");
       filters.push("gruppo");
     }
@@ -34,7 +33,7 @@ export const chatController = async (req: Request, res: Response) => {
     if (messageLower.includes("dipartiment")) {
       filters.push("dipartiment");
     }
-    if (messageLower.includes("scrutini") || messageLower.includes("scrutinio")) {
+    if (messageLower.includes("scrutin")) {
       filters.push("scrutini");
       filters.push("scrutinio");
     }
@@ -46,7 +45,7 @@ export const chatController = async (req: Request, res: Response) => {
       filters.push("consigli", "consiglio", "glo", "gruppo", "collegio", "dipartiment", "scrutini", "riceviment");
     }
 
-    console.log(`🔍 Filtri applicati: ${filters.join(", ")}`);
+    console.log(` Filtri applicati: ${filters.join(", ")}`);
 
     const filteredEvents = allEvents.filter(e => {
       const typeLower = e.type.toLowerCase();
@@ -56,14 +55,13 @@ export const chatController = async (req: Request, res: Response) => {
 
     console.log(`✅ Eventi dopo il filtro: ${filteredEvents.length}`);
 
-    // 🔍 DEBUG: Mostra quanti eventi di ogni tipo sono stati trovati
     const typeCount: Record<string, number> = {};
     filteredEvents.forEach(e => {
       typeCount[e.type] = (typeCount[e.type] || 0) + 1;
     });
     console.log("📊 Eventi per tipo:", typeCount);
 
-    // 3. FILTRO TEMPORALE
+    // Filtro temporale
     let finalEvents = filteredEvents;
     
     const monthMap: Record<string, number> = {
@@ -102,15 +100,13 @@ export const chatController = async (req: Request, res: Response) => {
 
       console.log(`📊 Eventi nel periodo: ${finalEvents.length}`);
 
-      // 🔍 DEBUG: Mostra quanti eventi di ogni tipo dopo il filtro temporale
       const finalTypeCount: Record<string, number> = {};
       finalEvents.forEach(e => {
         finalTypeCount[e.type] = (finalTypeCount[e.type] || 0) + 1;
       });
-      console.log(" Eventi finali per tipo:", finalTypeCount);
+      console.log("📊 Eventi finali per tipo:", finalTypeCount);
     }
 
-    // 4. COMPRESSIONE
     const eventsContext = finalEvents
       .slice(0, 400)
       .map(e => {
@@ -121,7 +117,6 @@ export const chatController = async (req: Request, res: Response) => {
       .join("\n");
 
     console.log("🤖 Chiamata a Groq API in corso...");
-    console.log("📝 Dati inviati all'AI (primi 500 caratteri):", eventsContext.substring(0, 500));
 
     const openai = new OpenAI({
       apiKey: process.env.OPENAI_API_KEY,
