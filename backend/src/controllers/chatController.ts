@@ -15,14 +15,14 @@ export const chatController = async (req: Request, res: Response) => {
     });
 
     const allEvents = circulars.flatMap(c => c.events);
-    console.log(`📊 Eventi totali nel DB: ${allEvents.length}`);
+    console.log(` Eventi totali nel DB: ${allEvents.length}`);
 
-    // 2. FILTRAGGIO DETERMINISTICO NEL BACKEND (non nell'AI!)
-    // Analizziamo la domanda dell'utente per capire quali tipi di evento includere
+    // 2. FILTRAGGIO DETERMINISTICO NEL BACKEND
     const filters: string[] = [];
     
-    // Rileva i tipi di evento richiesti nella domanda
-    if (messageLower.includes("consiglio di classe") || messageLower.includes("cdc")) {
+    // ✅ CORRETTO: Cerca sia "consiglio" che "consigli" (singolare e plurale)
+    if (messageLower.includes("consiglio") || messageLower.includes("consigli") || messageLower.includes("cdc")) {
+      filters.push("consigli");
       filters.push("consiglio");
     }
     if (messageLower.includes("glo") || messageLower.includes("gruppo di lavoro")) {
@@ -35,8 +35,9 @@ export const chatController = async (req: Request, res: Response) => {
     if (messageLower.includes("dipartiment")) {
       filters.push("dipartiment");
     }
-    if (messageLower.includes("scrutini")) {
+    if (messageLower.includes("scrutini") || messageLower.includes("scrutinio")) {
       filters.push("scrutini");
+      filters.push("scrutinio");
     }
     if (messageLower.includes("riceviment")) {
       filters.push("riceviment");
@@ -44,10 +45,10 @@ export const chatController = async (req: Request, res: Response) => {
 
     // Se non ha specificato nulla, includi tutto
     if (filters.length === 0) {
-      filters.push("consiglio", "glo", "gruppo", "collegio", "dipartiment", "scrutini", "riceviment");
+      filters.push("consigli", "consiglio", "glo", "gruppo", "collegio", "dipartiment", "scrutini", "riceviment");
     }
 
-    console.log(`🔍 Filtri applicati: ${filters.join(", ")}`);
+    console.log(` Filtri applicati: ${filters.join(", ")}`);
 
     // Applica il filtro agli eventi
     const filteredEvents = allEvents.filter(e => {
@@ -56,23 +57,20 @@ export const chatController = async (req: Request, res: Response) => {
       return filters.some(f => typeLower.includes(f) || titleLower.includes(f));
     });
 
-    console.log(` Eventi dopo il filtro: ${filteredEvents.length}`);
+    console.log(`✅ Eventi dopo il filtro: ${filteredEvents.length}`);
 
-    // 3. FILTRO TEMPORALE (se l'utente specifica un periodo)
+    // 3. FILTRO TEMPORALE
     let finalEvents = filteredEvents;
     
-    // Rileva il periodo dalla domanda (es. "da ottobre 2025 a marzo 2026")
     const monthMap: Record<string, number> = {
       "gennaio": 1, "febbraio": 2, "marzo": 3, "aprile": 4,
       "maggio": 5, "giugno": 6, "luglio": 7, "agosto": 8,
       "settembre": 9, "ottobre": 10, "novembre": 11, "dicembre": 12
     };
 
-    // Estrai mesi e anni dalla domanda
     const monthsFound: { month: number; year: number }[] = [];
     for (const [monthName, monthNum] of Object.entries(monthMap)) {
       if (messageLower.includes(monthName)) {
-        // Cerca l'anno vicino al nome del mese
         const yearMatch = message.match(/(\d{4})/g);
         if (yearMatch) {
           for (const year of yearMatch) {
@@ -82,9 +80,7 @@ export const chatController = async (req: Request, res: Response) => {
       }
     }
 
-    // Se abbiamo trovato un periodo, filtra gli eventi
     if (monthsFound.length >= 2) {
-      // Ordina i mesi trovati per data
       monthsFound.sort((a, b) => {
         if (a.year !== b.year) return a.year - b.year;
         return a.month - b.month;
@@ -99,14 +95,14 @@ export const chatController = async (req: Request, res: Response) => {
         const [day, month, year] = e.date.split('/').map(Number);
         const eventDate = new Date(year, month - 1, day);
         const start = new Date(startDate.year, startDate.month - 1, 1);
-        const end = new Date(endDate.year, endDate.month, 0); // Ultimo giorno del mese
+        const end = new Date(endDate.year, endDate.month, 0);
         return eventDate >= start && eventDate <= end;
       });
 
-      console.log(`📊 Eventi nel periodo: ${finalEvents.length}`);
+      console.log(` Eventi nel periodo: ${finalEvents.length}`);
     }
 
-    // 4. COMPRESSIONE: Formato compatto per l'AI
+    // 4. COMPRESSIONE
     const eventsContext = finalEvents
       .slice(0, 400)
       .map(e => {
@@ -116,14 +112,13 @@ export const chatController = async (req: Request, res: Response) => {
       })
       .join("\n");
 
-    console.log(" Chiamata a Groq API in corso...");
+    console.log("🤖 Chiamata a Groq API in corso...");
 
     const openai = new OpenAI({
       apiKey: process.env.OPENAI_API_KEY,
       baseURL: "https://api.groq.com/openai/v1",
     });
 
-    // 5. Chiamata all'API - ORA L'AI DEVE SOLO FARE LA SOMMA MATEMATICA
     const response = await openai.chat.completions.create({
       model: "llama-3.1-8b-instant", 
       messages: [
