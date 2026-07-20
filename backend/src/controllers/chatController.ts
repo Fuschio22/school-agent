@@ -9,14 +9,15 @@ export const chatController = async (req: Request, res: Response) => {
     const { message } = req.body;
     const messageLower = message.toLowerCase();
     
+    // 1. Recuperiamo gli eventi dal database
     const circulars = await prisma.circular.findMany({
       include: { events: true }
     });
 
     const allEvents = circulars.flatMap(c => c.events);
-    console.log(` Eventi totali nel DB: ${allEvents.length}`);
+    console.log(`📊 Eventi totali nel DB: ${allEvents.length}`);
 
-    // ✅ FIX: uso "consig" per matchare sia "consiglio" che "consigli"
+    // 2. FILTRAGGIO FLESSIBILE (mantenuto come prima)
     const filters: string[] = [];
     
     if (messageLower.includes("consig") || messageLower.includes("cdc")) {
@@ -45,7 +46,7 @@ export const chatController = async (req: Request, res: Response) => {
       filters.push("consigli", "consiglio", "glo", "gruppo", "collegio", "dipartiment", "scrutini", "riceviment");
     }
 
-    console.log(` Filtri applicati: ${filters.join(", ")}`);
+    console.log(`🔍 Filtri applicati: ${filters.join(", ")}`);
 
     const filteredEvents = allEvents.filter(e => {
       const typeLower = e.type.toLowerCase();
@@ -55,13 +56,14 @@ export const chatController = async (req: Request, res: Response) => {
 
     console.log(`✅ Eventi dopo il filtro: ${filteredEvents.length}`);
 
+    // Log dettagliati per tipo
     const typeCount: Record<string, number> = {};
     filteredEvents.forEach(e => {
       typeCount[e.type] = (typeCount[e.type] || 0) + 1;
     });
     console.log("📊 Eventi per tipo:", typeCount);
 
-    // Filtro temporale
+    // 3. FILTRO TEMPORALE
     let finalEvents = filteredEvents;
     
     const monthMap: Record<string, number> = {
@@ -88,7 +90,7 @@ export const chatController = async (req: Request, res: Response) => {
       const startDate = periods[0];
       const endDate = periods[periods.length - 1];
 
-      console.log(` Periodo richiesto: ${startDate.month}/${startDate.year} - ${endDate.month}/${endDate.year}`);
+      console.log(`📅 Periodo richiesto: ${startDate.month}/${startDate.year} - ${endDate.month}/${endDate.year}`);
 
       finalEvents = filteredEvents.filter(e => {
         const [day, month, year] = e.date.split('/').map(Number);
@@ -107,17 +109,34 @@ export const chatController = async (req: Request, res: Response) => {
       console.log("📊 Eventi finali per tipo:", finalTypeCount);
     }
 
-    const eventsContext = finalEvents
-      .slice(0, 400)
-      .map(e => {
-        const shortDate = e.date.length >= 8 ? `${e.date.slice(0, 5)}/${e.date.slice(-2)}` : e.date;
-        const shortTitle = e.title.length > 30 ? e.title.substring(0, 30) + "..." : e.title;
-        return `${shortDate} | ${e.type} | ${shortTitle} | ${e.startTime}-${e.endTime}`;
-      })
-      .join("\n");
+    // 4. ✅ CALCOLO PRECISO DELLE ORE NEL BACKEND (non nell'AI!)
+    const totalMinutes = finalEvents.reduce((sum, e) => {
+      if (!e.startTime || !e.endTime) return sum;
+      
+      const [start, end] = e.startTime.split('-');
+      const [startH, startM] = start.split(':').map(Number);
+      const [endH, endM] = end.split(':').map(Number);
+      
+      const startTotal = startH * 60 + startM;
+      const endTotal = endH * 60 + endM;
+      
+      const duration = endTotal - startTotal;
+      return sum + (duration > 0 ? duration : 0);
+    }, 0);
 
-    console.log("🤖 Chiamata a Groq API in corso...");
+    const hours = Math.floor(totalMinutes / 60);
+    const minutes = totalMinutes % 60;
+    
+    console.log(`✅ CALCOLO PRECISO: ${totalMinutes} min = ${hours} ore e ${minutes} min`);
 
+    // 5. Costruiamo l'elenco eventi per la risposta
+    const eventsList = finalEvents.map(e => {
+      const shortDate = e.date.length >= 8 ? `${e.date.slice(0, 5)}/${e.date.slice(-2)}` : e.date;
+      const shortTitle = e.title.length > 35 ? e.title.substring(0, 35) + "..." : e.title;
+      return `${shortDate} | ${e.type} | ${shortTitle} | ${e.startTime}-${e.endTime}`;
+    }).join("\n");
+
+    // 6. Chiamata all'AI SOLO per generare il testo (non per calcolare!)
     const openai = new OpenAI({
       apiKey: process.env.OPENAI_API_KEY,
       baseURL: "https://api.groq.com/openai/v1",
@@ -129,19 +148,20 @@ export const chatController = async (req: Request, res: Response) => {
       messages: [
         {
           role: "system",
-          content: `Sei un assistente contabile preciso. Devi SOLO calcolare la somma delle durate degli eventi forniti.
+          content: `Sei SchoolAgent, un assistente preciso per un docente.
           
-          DATI DEGLI EVENTI (Formato: Data | Tipo | Titolo | Orario Inizio-Fine):
-          ${eventsContext}
+          DATI GIA' CALCOLATI (NON DEVI RICALCOLARLI):
+          - Totale ore: ${hours} ore e ${minutes} minuti (${totalMinutes} minuti totali)
+          - Numero eventi: ${finalEvents.length}
+          
+          ELENCO EVENTI INCLUSI:
+          ${eventsList}
 
           ISTRUZIONI:
-          1. Per ogni evento, calcola la durata in minuti (es. 15:00-15:45 = 45 min).
-          2. Somma tutte le durate.
-          3. Converti il totale in ore e minuti (es. 135 min = 2 ore e 15 minuti).
-          4. Rispondi con: "Totale: X ore e Y minuti".
-          5. Elenca brevemente gli eventi inclusi nel calcolo.
-          
-          NON filtrare, NON ignorare eventi, NON aggiungere eventi. Usa SOLO i dati forniti.`
+          1. Usa ESATTAMENTE il totale fornito: "${hours} ore e ${minutes} minuti". NON ricalcolare.
+          2. Elenca brevemente gli eventi inclusi nel calcolo.
+          3. Usa un tono professionale e preciso.
+          4. NON inventare numeri, NON ricalcolare. Usa SOLO i dati forniti.`
         },
         {
           role: "user",
@@ -151,12 +171,13 @@ export const chatController = async (req: Request, res: Response) => {
       temperature: 0.0,
     });
 
-    const aiResponse = response.choices[0]?.message?.content || "Mi dispiace, non sono riuscito a elaborare la risposta.";
-    console.log("✅ Risposta AI generata con successo.");
+    const aiResponse = response.choices[0]?.message?.content || 
+      `Totale: ${hours} ore e ${minutes} minuti.`;
     
+    console.log("✅ Risposta AI generata con successo.");
     res.json({ response: aiResponse });
   } catch (error: any) {
-    console.error("❌ Errore CRITICO nella chat:", error.message);
+    console.error(" Errore CRITICO nella chat:", error.message);
     res.status(500).json({ error: "Errore interno: " + error.message });
   }
 };
