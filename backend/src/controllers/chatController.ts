@@ -101,6 +101,7 @@ export const chatController = async (req: Request, res: Response) => {
 
     // 4. CALCOLO PRECISO DELLE ORE NEL BACKEND
     let totalMinutes = 0;
+    const eventDetails: string[] = [];
     
     finalEvents.forEach(e => {
       if (!e.startTime || !e.endTime) {
@@ -118,6 +119,8 @@ export const chatController = async (req: Request, res: Response) => {
           const duration = endTotal - startTotal;
           if (duration > 0) {
             totalMinutes += duration;
+            // Costruiamo il dettaglio dell'evento
+            eventDetails.push(`• ${e.date} | ${e.type} | ${e.title} | ${e.startTime}-${e.endTime} (${duration} min)`);
           }
         }
       } catch (err) {
@@ -130,59 +133,20 @@ export const chatController = async (req: Request, res: Response) => {
     
     console.log(`✅ CALCOLO PRECISO: ${totalMinutes} min = ${hours} ore e ${minutes} min`);
 
-    // 5. Elenco eventi per la risposta
-    const eventsList = finalEvents.map(e => {
-      const shortDate = e.date || "";
-      const shortTitle = (e.title || "").length > 40 ? (e.title || "").substring(0, 40) + "..." : (e.title || "");
-      return `${shortDate} | ${e.type || ""} | ${shortTitle} | ${e.startTime || ""}-${e.endTime || ""}`;
-    }).join("\n");
+    // 5. Costruiamo la risposta direttamente (SENZA AI!)
+    const responseText = `
+**Eventi inclusi nel calcolo (${finalEvents.length} eventi):**
 
-    // 6. Chiamata all'AI - Mostriamo gli eventi ma le diciamo di NON ricalcolare
-    const openai = new OpenAI({
-      apiKey: process.env.OPENAI_API_KEY,
-      baseURL: "https://api.groq.com/openai/v1",
-    });
+${eventDetails.join("\n")}
 
-    const response = await openai.chat.completions.create({
-      model: "llama-3.1-8b-instant", 
-      max_tokens: 2048,
-      messages: [
-        {
-          role: "system",
-          content: `Sei SchoolAgent, un assistente preciso per un docente.
-          
-          IL SISTEMA HA GIA' CALCOLATO IL TOTALE. Tu devi:
-          1. Elenca gli eventi inclusi nel calcolo
-          2. Mostra il totale GIA' CALCOLATO (NON RICALCOLARE)
-          
-          EVENTI INCLUSI NEL CALCOLO:
-          ${eventsList}
-          
-          TOTALE GIA' CALCOLATO DAL SISTEMA:
-          ${hours} ore e ${minutes} minuti (${totalMinutes} minuti totali)
-          
-          ISTRUZIONI IMPORTANTI:
-          - Elenca gli eventi in modo chiaro e ordinato
-          - Alla fine, scrivi ESATTAMENTE: "Totale: ${hours} ore e ${minutes} minuti"
-          - NON ricalcolare, NON sommare di nuovo, NON modificare il totale
-          - Usa SOLO il totale fornito sopra
-          - Se un utente chiede verifica, dì che il calcolo è stato fatto dal sistema backend`
-        },
-        {
-          role: "user",
-          content: message
-        }
-      ],
-      temperature: 0.0,
-    });
+---
 
-    const aiResponse = response.choices[0]?.message?.content || 
-      `Totale: ${hours} ore e ${minutes} minuti.`;
-    
-    console.log("✅ Risposta AI generata con successo.");
-    res.json({ response: aiResponse });
+**Totale: ${hours} ore e ${minutes} minuti** (${totalMinutes} minuti totali)
+    `.trim();
+
+    res.json({ response: responseText });
   } catch (error: any) {
-    console.error(" Errore CRITICO nella chat:", error.message);
+    console.error("❌ Errore CRITICO nella chat:", error.message);
     res.status(500).json({ error: "Errore interno: " + error.message });
   }
 };
