@@ -8,18 +8,54 @@ export const chatController = async (req: Request, res: Response) => {
   try {
     const { message } = req.body;
     
-    // 1. Recuperiamo gli eventi dal database (prendiamo gli ultimi 200 per stare nel limite token)
+    // 1. Recuperiamo gli eventi dal database
     const circulars = await prisma.circular.findMany({
       include: { events: true }
     });
 
     const allEvents = circulars.flatMap(c => c.events);
-    console.log(`📊 Trovati ${allEvents.length} eventi totali nel DB.`);
+    console.log(`📊 Eventi totali nel DB: ${allEvents.length}`);
 
-    // 2. COMPRESSIONE DATI: Formato ultra-leggero (max 200 eventi più recenti)
-    const eventsContext = allEvents
-      .slice(0, 200)
-      .map(e => `${e.date} | ${e.type} | ${e.title} | ${e.startTime}-${e.endTime}`)
+    // 2. FILTRO: Teniamo solo gli eventi rilevanti per il CCNL
+    const relevantEvents = allEvents.filter(e => 
+      e.type.toLowerCase().includes("consiglio") || 
+      e.type.toLowerCase().includes("glo") || 
+      e.type.toLowerCase().includes("gruppo") ||
+      e.type.toLowerCase().includes("collegio") || 
+      e.type.toLowerCase().includes("scrutini") ||
+      e.type.toLowerCase().includes("dipartimenti") ||
+      e.type.toLowerCase().includes("ricevimento")
+    );
+
+    console.log(`📊 Eventi rilevanti trovati: ${relevantEvents.length}`);
+
+    // 3. COMPRESSIONE ESTREMA: Ordiniamo dal più VECCHIO al più RECENTE (cronologico)
+    const eventsContext = relevantEvents
+      .sort((a, b) => {
+        // Ordina per data crescente (più vecchio prima)
+        const [dA, mA, yA] = a.date.split('/').map(Number);
+        const [dB, mB, yB] = b.date.split('/').map(Number);
+        return new Date(yA, mA - 1, dA).getTime() - new Date(yB, mB - 1, dB).getTime();
+      })
+      .slice(0, 400) 
+      .map(e => {
+        // Accorcia la data: 14/10/2025 -> 14/10/25
+        const shortDate = e.date.length >= 8 ? `${e.date.slice(0, 5)}/${e.date.slice(-2)}` : e.date;
+        
+        // Accorcia il tipo
+        let shortType = "ALTRO";
+        const typeLower = e.type.toLowerCase();
+        if (typeLower.includes("consiglio")) shortType = "CDC";
+        else if (typeLower.includes("glo") || typeLower.includes("gruppo")) shortType = "GLO";
+        else if (typeLower.includes("collegio")) shortType = "CD";
+        else if (typeLower.includes("dipartimenti")) shortType = "DIP";
+        else if (typeLower.includes("scrutini")) shortType = "SCR";
+
+        // Accorcia il titolo se è troppo lungo
+        const shortTitle = e.title.length > 35 ? e.title.substring(0, 35) + "..." : e.title;
+
+        return `${shortDate} | ${shortType} | ${shortTitle} | ${e.startTime}-${e.endTime}`;
+      })
       .join("\n");
 
     console.log("🤖 Chiamata a Groq API in corso...");
@@ -29,7 +65,7 @@ export const chatController = async (req: Request, res: Response) => {
       baseURL: "https://api.groq.com/openai/v1",
     });
 
-    // 3. Chiamata all'API con istruzioni RIGOROSE
+    // 4. Chiamata all'API con istruzioni RIGOROSE
     const response = await openai.chat.completions.create({
       model: "llama-3.1-8b-instant", 
       messages: [
@@ -37,24 +73,23 @@ export const chatController = async (req: Request, res: Response) => {
           role: "system",
           content: `Sei SchoolAgent, un assistente contabile preciso e rigoroso per un docente.
           
-          DATI DEGLI EVENTI (Formato: Data | Tipo | Titolo/Classe | Orario Inizio-Fine):
+          DATI DEGLI EVENTI (Formato: Data | Tipo | Titolo/Classe | Orario):
           ${eventsContext}
 
           ISTRUZIONI DI CALCOLO ASSOLUTE E RIGOROSE:
-          1. IDENTIFICA LA RICHIESTA: Leggi attentamente quali TIPI di evento l'utente ha chiesto ESPLICITAMENTE (es. "Consigli di Classe e GLO").
-          2. FILTRO ESCLUSIVO: Considera SOLO gli eventi il cui "Tipo" o "Titolo" corrisponde ESATTAMENTE a quanto richiesto. 
-          3. IGNORA TUTTO IL RESTO: Se l'utente non ha menzionato "Collegi", "Dipartimenti", "Scrutini" o "Ricevimenti", NON includerli nel calcolo. Devono essere completamente ignorati.
-          4. FILTRO TEMPORALE: Dei soli eventi validi, tieni solo quelli che rientrano nel periodo di date richiesto.
-          5. CALCOLO: Per ogni evento valido, calcola la durata in minuti (es. 15:00-15:45 = 45 min).
-          6. SOMMA: Somma le durate e converti il totale in ore e minuti (es. 135 min = 2 ore e 15 minuti).
-          7. OUTPUT: Mostra il risultato finale in modo chiaro: "Totale: X ore e Y minuti". Elenca brevemente gli eventi che hai incluso nel calcolo per trasparenza. Se non ce ne sono, dillo esplicitamente. NON inventare mai numeri.`
+          1. IDENTIFICA LA RICHIESTA: Leggi quali TIPI di evento e/o CLASSI l'utente ha chiesto ESPLICITAMENTE.
+          2. FILTRO ESCLUSIVO: Considera SOLO gli eventi che corrispondono ESATTAMENTE. Se l'utente chiede "Consigli e GLO", IGNORA totalmente Collegi (CD), Dipartimenti (DIP) e Scrutini (SCR).
+          3. FILTRO TEMPORALE: Tieni solo gli eventi nel periodo di date richiesto.
+          4. CALCOLO: Per ogni evento valido, calcola la durata in minuti (es. 15:00-15:45 = 45 min).
+          5. SOMMA: Somma le durate e converti in ore e minuti.
+          6. OUTPUT: Mostra il risultato: "Totale: X ore e Y minuti". Elenca brevemente gli eventi inclusi in ordine cronologico. Se una classe specifica (es. 5A IPSASR) è richiesta ma non presente nei dati, dillo esplicitamente: "Attenzione: non trovo eventi per la 5A IPSASR nei dati forniti". NON inventare mai numeri.`
         },
         {
           role: "user",
           content: message
         }
       ],
-      temperature: 0.0, // Zero creatività, solo logica pura
+      temperature: 0.0,
     });
 
     const aiResponse = response.choices[0]?.message?.content || "Mi dispiace, non sono riuscito a elaborare la risposta.";
