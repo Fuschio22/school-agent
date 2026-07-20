@@ -44,14 +44,18 @@ export async function analyzeCircularText(text: string) {
            ✅ Controlla l'anno della circolare (es. "ottobre 2025").
            ✅ Se una riga ha un anno sbagliato, CORREGGILO automaticamente.
 
-        3. ORARI - REGOLA CRITICA:
-           ✅ Se la tabella mostra SOLO l'orario di inizio (es. "15:00", "15:45", "16:30") senza orario di fine:
-              → Calcola l'orario di fine aggiungendo **45 minuti** all'orario di inizio.
-              → Esempio: "15:00" → oraInizio: "15:00", oraFine: "15:45"
-              → Esempio: "15:45" → oraInizio: "15:45", oraFine: "16:30"
-              → Esempio: "16:30" → oraInizio: "16:30", oraFine: "17:15"
-           ✅ Se la tabella mostra ENTRAMBI gli orari (es. "15:00 - 16:00"), usa quelli.
-           ✅ VERIFICA SEMPRE che oraInizio < oraFine. MAI invertire gli orari!
+        3. ORARI - REGOLA CRITICA E ASSOLUTA:
+           ✅ SE la tabella mostra SOLO l'orario di inizio (es. una colonna con "15:00", "15:45", "16:30") SENZA orario di fine:
+              → DEVI calcolare l'orario di fine aggiungendo ESATTAMENTE 45 minuti all'orario di inizio.
+              → Esempio: se vedi "15:00" → oraInizio: "15:00", oraFine: "15:45"
+              → Esempio: se vedi "15:45" → oraInizio: "15:45", oraFine: "16:30"
+              → Esempio: se vedi "16:00" → oraInizio: "16:00", oraFine: "16:45"
+              → Esempio: se vedi "16:30" → oraInizio: "16:30", oraFine: "17:15"
+           
+           ✅ SE la tabella mostra ENTRAMBI gli orari (es. "15:00 - 16:00" o "15:00 – 16:00"), usa quelli esatti.
+           
+           ✅ VERIFICA SEMPRE che oraInizio < oraFine. MAI mettere lo stesso orario per inizio e fine!
+           ✅ Se per errore metti lo stesso orario, CORREGGI aggiungendo 45 minuti all'ora di fine.
 
         4. ESTRAZIONE DA TABELLE:
            ✅ LEGGI la tabella dall'INIZIO ALLA FINE, riga per riga.
@@ -70,6 +74,6 @@ export async function analyzeCircularText(text: string) {
   });
 
   const content = response.choices[0]?.message?.content || "{}";
-  console.log(" RAW AI JSON OUTPUT:", content);
+  console.log("🤖 RAW AI JSON OUTPUT:", content);
   return JSON.parse(content);
 }
