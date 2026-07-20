@@ -26,21 +26,6 @@ export default function VisualCalendar({ events }: VisualCalendarProps) {
     }
   }, [events]);
 
-  // 🎹 Gestione tasto ESC
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        setSelectedDate(null);
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    
-    return () => {
-      window.removeEventListener('keydown', handleKeyDown);
-    };
-  }, []); // Array vuoto = si esegue una volta sola al mount
-
   const year = currentDate.getFullYear();
   const month = currentDate.getMonth();
 
@@ -64,7 +49,6 @@ export default function VisualCalendar({ events }: VisualCalendarProps) {
     eventsByDate[key].push(event);
   });
 
-  // Ordina gli eventi per orario
   Object.keys(eventsByDate).forEach(key => {
     eventsByDate[key].sort((a, b) => a.startTime.localeCompare(b.startTime));
   });
@@ -138,12 +122,10 @@ export default function VisualCalendar({ events }: VisualCalendarProps) {
         </div>
       </div>
 
-      {/* Istruzione per l'utente */}
       <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg text-sm text-yellow-800">
         💡 <strong>Click su un giorno</strong> per vedere tutti gli eventi dettagliati
       </div>
 
-      {/* Griglia dei giorni */}
       <div className="grid grid-cols-7 gap-px bg-gray-200 border border-gray-200 rounded-lg overflow-hidden">
         {dayNames.map((day) => (
           <div key={day} className="bg-gray-50 p-2 text-center text-xs font-semibold text-gray-600 uppercase">
@@ -153,7 +135,6 @@ export default function VisualCalendar({ events }: VisualCalendarProps) {
         {days}
       </div>
 
-      {/* Dettaglio giorno selezionato - Pannello espanso */}
       {selectedDate && (
         <div className="mt-6 p-6 bg-gradient-to-br from-blue-50 to-indigo-50 border-2 border-blue-300 rounded-lg shadow-lg animate-in fade-in slide-in-from-bottom-2">
           <div className="flex justify-between items-center mb-4">

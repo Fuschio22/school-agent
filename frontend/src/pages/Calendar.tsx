@@ -45,6 +45,22 @@ export default function Calendar() {
     fetchEvents();
   }, []);
 
+  // 🎹 NUOVO: Gestione tasto ESC per chiudere il modale
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && selectedDay !== null) {
+        setSelectedDay(null);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+
+    // Pulizia: rimuove l'ascoltatore quando il componente viene smontato
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [selectedDay]);
+
   const getDaysInMonth = (date: Date) => {
     const year = date.getFullYear();
     const month = date.getMonth();
@@ -66,7 +82,6 @@ export default function Calendar() {
       return eventDate === dateStr || eventDate === `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
     });
     
-    // <-- AGGIUNTO: Ordina gli eventi per orario (startTime)
     return dayEvents.sort((a, b) => a.startTime.localeCompare(b.startTime));
   };
 
@@ -180,7 +195,6 @@ export default function Calendar() {
                   {day}
                 </div>
                 
-                {/* Mostra max 3 eventi nella griglia per non affollare */}
                 {dayEvents.slice(0, 3).map(event => (
                   <div
                     key={event.id}
@@ -191,7 +205,6 @@ export default function Calendar() {
                   </div>
                 ))}
                 
-                {/* Indicatore se ci sono più di 3 eventi */}
                 {dayEvents.length > 3 && (
                   <div className="text-xs text-slate-400 text-center mt-1 font-semibold">
                     +{dayEvents.length - 3} altri
@@ -248,7 +261,7 @@ export default function Calendar() {
                     
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-slate-300 mt-4">
                       <div className="flex items-start gap-3">
-                        <span className="text-xl"></span>
+                        <span className="text-xl">🕒</span>
                         <div>
                           <p className="text-slate-400 text-xs uppercase tracking-wider">Orario</p>
                           <p className="font-semibold text-white">{event.startTime} - {event.endTime}</p>
