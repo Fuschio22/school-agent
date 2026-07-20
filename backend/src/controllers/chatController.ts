@@ -56,7 +56,14 @@ export const chatController = async (req: Request, res: Response) => {
 
     console.log(`✅ Eventi dopo il filtro: ${filteredEvents.length}`);
 
-    // 3. FILTRO TEMPORALE CORRETTO
+    // 🔍 DEBUG: Mostra quanti eventi di ogni tipo sono stati trovati
+    const typeCount: Record<string, number> = {};
+    filteredEvents.forEach(e => {
+      typeCount[e.type] = (typeCount[e.type] || 0) + 1;
+    });
+    console.log("📊 Eventi per tipo:", typeCount);
+
+    // 3. FILTRO TEMPORALE
     let finalEvents = filteredEvents;
     
     const monthMap: Record<string, number> = {
@@ -65,7 +72,6 @@ export const chatController = async (req: Request, res: Response) => {
       "settembre": 9, "ottobre": 10, "novembre": 11, "dicembre": 12
     };
 
-    // ✅ CORRETTO: Cerca coppie mese-anno vicine nella stringa
     const periods: { month: number; year: number }[] = [];
     for (const [monthName, monthNum] of Object.entries(monthMap)) {
       const regex = new RegExp(`${monthName}\\s*(\\d{4})`, 'i');
@@ -76,7 +82,6 @@ export const chatController = async (req: Request, res: Response) => {
     }
 
     if (periods.length >= 2) {
-      // Ordina per data
       periods.sort((a, b) => {
         if (a.year !== b.year) return a.year - b.year;
         return a.month - b.month;
@@ -85,7 +90,7 @@ export const chatController = async (req: Request, res: Response) => {
       const startDate = periods[0];
       const endDate = periods[periods.length - 1];
 
-      console.log(`📅 Periodo richiesto: ${startDate.month}/${startDate.year} - ${endDate.month}/${endDate.year}`);
+      console.log(` Periodo richiesto: ${startDate.month}/${startDate.year} - ${endDate.month}/${endDate.year}`);
 
       finalEvents = filteredEvents.filter(e => {
         const [day, month, year] = e.date.split('/').map(Number);
@@ -95,7 +100,14 @@ export const chatController = async (req: Request, res: Response) => {
         return eventDate >= start && eventDate <= end;
       });
 
-      console.log(` Eventi nel periodo: ${finalEvents.length}`);
+      console.log(`📊 Eventi nel periodo: ${finalEvents.length}`);
+
+      // 🔍 DEBUG: Mostra quanti eventi di ogni tipo dopo il filtro temporale
+      const finalTypeCount: Record<string, number> = {};
+      finalEvents.forEach(e => {
+        finalTypeCount[e.type] = (finalTypeCount[e.type] || 0) + 1;
+      });
+      console.log(" Eventi finali per tipo:", finalTypeCount);
     }
 
     // 4. COMPRESSIONE
@@ -109,6 +121,7 @@ export const chatController = async (req: Request, res: Response) => {
       .join("\n");
 
     console.log("🤖 Chiamata a Groq API in corso...");
+    console.log("📝 Dati inviati all'AI (primi 500 caratteri):", eventsContext.substring(0, 500));
 
     const openai = new OpenAI({
       apiKey: process.env.OPENAI_API_KEY,
@@ -117,7 +130,7 @@ export const chatController = async (req: Request, res: Response) => {
 
     const response = await openai.chat.completions.create({
       model: "llama-3.1-8b-instant", 
-      max_tokens: 2048, // ✅ Aumentato per evitare che si fermi a metà
+      max_tokens: 2048,
       messages: [
         {
           role: "system",
