@@ -15,13 +15,12 @@ export const chatController = async (req: Request, res: Response) => {
     });
 
     const allEvents = circulars.flatMap(c => c.events);
-    console.log(` Eventi totali nel DB: ${allEvents.length}`);
+    console.log(`📊 Eventi totali nel DB: ${allEvents.length}`);
 
     // 2. FILTRAGGIO DETERMINISTICO NEL BACKEND
     const filters: string[] = [];
     
-    // ✅ CORRETTO: Cerca sia "consiglio" che "consigli" (singolare e plurale)
-    if (messageLower.includes("consiglio") || messageLower.includes("consigli") || messageLower.includes("cdc")) {
+    if (messageLower.includes("consiglio") || messageLower.includes("cdc")) {
       filters.push("consigli");
       filters.push("consiglio");
     }
@@ -43,14 +42,12 @@ export const chatController = async (req: Request, res: Response) => {
       filters.push("riceviment");
     }
 
-    // Se non ha specificato nulla, includi tutto
     if (filters.length === 0) {
       filters.push("consigli", "consiglio", "glo", "gruppo", "collegio", "dipartiment", "scrutini", "riceviment");
     }
 
-    console.log(` Filtri applicati: ${filters.join(", ")}`);
+    console.log(`🔍 Filtri applicati: ${filters.join(", ")}`);
 
-    // Applica il filtro agli eventi
     const filteredEvents = allEvents.filter(e => {
       const typeLower = e.type.toLowerCase();
       const titleLower = e.title.toLowerCase();
@@ -59,7 +56,7 @@ export const chatController = async (req: Request, res: Response) => {
 
     console.log(`✅ Eventi dopo il filtro: ${filteredEvents.length}`);
 
-    // 3. FILTRO TEMPORALE
+    // 3. FILTRO TEMPORALE CORRETTO
     let finalEvents = filteredEvents;
     
     const monthMap: Record<string, number> = {
@@ -68,26 +65,25 @@ export const chatController = async (req: Request, res: Response) => {
       "settembre": 9, "ottobre": 10, "novembre": 11, "dicembre": 12
     };
 
-    const monthsFound: { month: number; year: number }[] = [];
+    // ✅ CORRETTO: Cerca coppie mese-anno vicine nella stringa
+    const periods: { month: number; year: number }[] = [];
     for (const [monthName, monthNum] of Object.entries(monthMap)) {
-      if (messageLower.includes(monthName)) {
-        const yearMatch = message.match(/(\d{4})/g);
-        if (yearMatch) {
-          for (const year of yearMatch) {
-            monthsFound.push({ month: monthNum, year: parseInt(year) });
-          }
-        }
+      const regex = new RegExp(`${monthName}\\s*(\\d{4})`, 'i');
+      const match = message.match(regex);
+      if (match) {
+        periods.push({ month: monthNum, year: parseInt(match[1]) });
       }
     }
 
-    if (monthsFound.length >= 2) {
-      monthsFound.sort((a, b) => {
+    if (periods.length >= 2) {
+      // Ordina per data
+      periods.sort((a, b) => {
         if (a.year !== b.year) return a.year - b.year;
         return a.month - b.month;
       });
 
-      const startDate = monthsFound[0];
-      const endDate = monthsFound[monthsFound.length - 1];
+      const startDate = periods[0];
+      const endDate = periods[periods.length - 1];
 
       console.log(`📅 Periodo richiesto: ${startDate.month}/${startDate.year} - ${endDate.month}/${endDate.year}`);
 
@@ -121,6 +117,7 @@ export const chatController = async (req: Request, res: Response) => {
 
     const response = await openai.chat.completions.create({
       model: "llama-3.1-8b-instant", 
+      max_tokens: 2048, // ✅ Aumentato per evitare che si fermi a metà
       messages: [
         {
           role: "system",
