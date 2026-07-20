@@ -3,26 +3,20 @@ import OpenAI from "openai";
 import { prisma } from "../lib/prisma";
 
 export const chatController = async (req: Request, res: Response) => {
+  console.log("📨 Richiesta chat ricevuta:", req.body?.message);
+  
   try {
     const { message } = req.body;
-    const userEmail = "demo@schoolagent.it"; 
-
-    // 1. Recupera tutti gli eventi dell'utente
-    const user = await prisma.user.findUnique({
-      where: { email: userEmail },
-      include: {
-        circulars: {
-          include: { events: true }
-        }
-      }
+    
+    // 1. Recuperiamo TUTTI gli eventi dal database (senza filtrare per utente demo)
+    const circulars = await prisma.circular.findMany({
+      include: { events: true }
     });
 
-    if (!user) {
-      return res.status(404).json({ error: "Utente non trovato" });
-    }
+    const allEvents = circulars.flatMap(c => c.events);
+    console.log(`📊 Trovati ${allEvents.length} eventi totali nel DB.`);
 
-    // 2. FILTRO INTELLIGENTE: Teniamo solo gli eventi rilevanti per il calcolo delle ore
-    const allEvents = user.circulars.flatMap(c => c.events);
+    // 2. FILTRO INTELLIGENTE: Teniamo solo gli eventi rilevanti per il CCNL
     const relevantEvents = allEvents.filter(e => 
       e.type.toLowerCase().includes("consiglio") || 
       e.type.toLowerCase().includes("glo") || 
@@ -32,19 +26,20 @@ export const chatController = async (req: Request, res: Response) => {
       e.type.toLowerCase().includes("ricevimento")
     );
 
-    // 3. COMPRESSIONE DATI: Formato ultra-leggero per restare sotto i 6000 token
-    // Prendiamo fino a 200 eventi (più che sufficienti per coprire ottobre-marzo)
+    // 3. COMPRESSIONE DATI: Formato ultra-leggero (max 200 eventi)
     const eventsContext = relevantEvents
       .slice(0, 200)
       .map(e => `${e.date} | ${e.type} | ${e.title} | ${e.startTime}-${e.endTime}`)
       .join("\n");
+
+    console.log("🤖 Chiamata a Groq API in corso...");
 
     const openai = new OpenAI({
       apiKey: process.env.OPENAI_API_KEY,
       baseURL: "https://api.groq.com/openai/v1",
     });
 
-    // 4. Chiamata all'API con modello leggero (8B) e istruzioni di calcolo precise
+    // 4. Chiamata all'API con modello leggero (8B)
     const response = await openai.chat.completions.create({
       model: "llama-3.1-8b-instant", 
       messages: [
@@ -56,9 +51,9 @@ export const chatController = async (req: Request, res: Response) => {
           ${eventsContext}
 
           ISTRUZIONI DI CALCOLO ASSOLUTE:
-          1. Quando l'utente chiede un totale di ore per un periodo (es. "da ottobre a marzo"), FILTRA mentalmente gli eventi di quel periodo.
-          2. Per ogni evento, calcola la durata in minuti (es. 15:00-15:45 = 45 min; 14:30-15:30 = 60 min).
-          3. Somma tutte le durate degli eventi che corrispondono alla richiesta (es. solo "Consigli di Classe" e "GLO").
+          1. Quando l'utente chiede un totale di ore per un periodo, FILTRA mentalmente gli eventi di quel periodo.
+          2. Per ogni evento, calcola la durata in minuti (es. 15:00-15:45 = 45 min).
+          3. Somma tutte le durate degli eventi che corrispondono alla richiesta.
           4. Converti il totale dei minuti in ore e minuti (es. 135 min = 2 ore e 15 minuti).
           5. Mostra il risultato finale in modo chiaro: "Totale: X ore e Y minuti".
           6. Se non ci sono dati per quel periodo, dillo esplicitamente. Non inventare mai numeri.`
@@ -68,21 +63,15 @@ export const chatController = async (req: Request, res: Response) => {
           content: message
         }
       ],
-      temperature: 0.1, // Bassissima per massimizzare la precisione matematica
+      temperature: 0.1,
     });
 
     const aiResponse = response.choices[0]?.message?.content || "Mi dispiace, non sono riuscito a elaborare la risposta.";
+    console.log("✅ Risposta AI generata con successo.");
     
     res.json({ response: aiResponse });
   } catch (error: any) {
-    console.error("❌ Errore nella chat:", error);
-    
-    if (error.status === 429) {
-      return res.status(429).json({ 
-        error: "Limite di richieste temporaneo raggiunto. Aspetta un minuto e riprova." 
-      });
-    }
-    
-    res.status(500).json({ error: "Errore interno del server durante la chat" });
+    console.error("❌ Errore CRITICO nella chat:", error.message);
+    res.status(500).json({ error: "Errore interno: " + error.message });
   }
 };
