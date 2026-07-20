@@ -3,7 +3,7 @@ import OpenAI from "openai";
 import { prisma } from "../lib/prisma";
 
 export const chatController = async (req: Request, res: Response) => {
-  console.log("📨 Richiesta chat ricevuta:", req.body?.message);
+  console.log(" Richiesta chat ricevuta:", req.body?.message);
   
   try {
     const { message } = req.body;
@@ -17,7 +17,7 @@ export const chatController = async (req: Request, res: Response) => {
     const allEvents = circulars.flatMap(c => c.events);
     console.log(`📊 Eventi totali nel DB: ${allEvents.length}`);
 
-    // 2. FILTRAGGIO FLESSIBILE (mantenuto come prima)
+    // 2. FILTRAGGIO FLESSIBILE
     const filters: string[] = [];
     
     if (messageLower.includes("consig") || messageLower.includes("cdc")) {
@@ -49,19 +49,12 @@ export const chatController = async (req: Request, res: Response) => {
     console.log(`🔍 Filtri applicati: ${filters.join(", ")}`);
 
     const filteredEvents = allEvents.filter(e => {
-      const typeLower = e.type.toLowerCase();
-      const titleLower = e.title.toLowerCase();
+      const typeLower = (e.type || "").toLowerCase();
+      const titleLower = (e.title || "").toLowerCase();
       return filters.some(f => typeLower.includes(f) || titleLower.includes(f));
     });
 
     console.log(`✅ Eventi dopo il filtro: ${filteredEvents.length}`);
-
-    // Log dettagliati per tipo
-    const typeCount: Record<string, number> = {};
-    filteredEvents.forEach(e => {
-      typeCount[e.type] = (typeCount[e.type] || 0) + 1;
-    });
-    console.log("📊 Eventi per tipo:", typeCount);
 
     // 3. FILTRO TEMPORALE
     let finalEvents = filteredEvents;
@@ -93,7 +86,10 @@ export const chatController = async (req: Request, res: Response) => {
       console.log(`📅 Periodo richiesto: ${startDate.month}/${startDate.year} - ${endDate.month}/${endDate.year}`);
 
       finalEvents = filteredEvents.filter(e => {
-        const [day, month, year] = e.date.split('/').map(Number);
+        if (!e.date) return false;
+        const parts = e.date.split('/');
+        if (parts.length !== 3) return false;
+        const [day, month, year] = parts.map(Number);
         const eventDate = new Date(year, month - 1, day);
         const start = new Date(startDate.year, startDate.month - 1, 1);
         const end = new Date(endDate.year, endDate.month, 0);
@@ -101,28 +97,34 @@ export const chatController = async (req: Request, res: Response) => {
       });
 
       console.log(`📊 Eventi nel periodo: ${finalEvents.length}`);
-
-      const finalTypeCount: Record<string, number> = {};
-      finalEvents.forEach(e => {
-        finalTypeCount[e.type] = (finalTypeCount[e.type] || 0) + 1;
-      });
-      console.log("📊 Eventi finali per tipo:", finalTypeCount);
     }
 
-    // 4. ✅ CALCOLO PRECISO DELLE ORE NEL BACKEND (non nell'AI!)
-    const totalMinutes = finalEvents.reduce((sum, e) => {
-      if (!e.startTime || !e.endTime) return sum;
+    // 4. ✅ CALCOLO PRECISO DELLE ORE NEL BACKEND (con protezione errori)
+    let totalMinutes = 0;
+    
+    finalEvents.forEach(e => {
+      // Se mancano gli orari, salta l'evento per evitare il crash
+      if (!e.startTime || !e.endTime) {
+        console.log(`⚠️ Evento saltato (orari mancanti): ${e.title}`);
+        return;
+      }
       
-      const [start, end] = e.startTime.split('-');
-      const [startH, startM] = start.split(':').map(Number);
-      const [endH, endM] = end.split(':').map(Number);
-      
-      const startTotal = startH * 60 + startM;
-      const endTotal = endH * 60 + endM;
-      
-      const duration = endTotal - startTotal;
-      return sum + (duration > 0 ? duration : 0);
-    }, 0);
+      try {
+        const [startH, startM] = String(e.startTime).split(':').map(Number);
+        const [endH, endM] = String(e.endTime).split(':').map(Number);
+        
+        if (!isNaN(startH) && !isNaN(startM) && !isNaN(endH) && !isNaN(endM)) {
+          const startTotal = startH * 60 + startM;
+          const endTotal = endH * 60 + endM;
+          const duration = endTotal - startTotal;
+          if (duration > 0) {
+            totalMinutes += duration;
+          }
+        }
+      } catch (err) {
+        console.log(`⚠️ Errore calcolo su evento: ${e.title}`);
+      }
+    });
 
     const hours = Math.floor(totalMinutes / 60);
     const minutes = totalMinutes % 60;
@@ -131,12 +133,12 @@ export const chatController = async (req: Request, res: Response) => {
 
     // 5. Costruiamo l'elenco eventi per la risposta
     const eventsList = finalEvents.map(e => {
-      const shortDate = e.date.length >= 8 ? `${e.date.slice(0, 5)}/${e.date.slice(-2)}` : e.date;
-      const shortTitle = e.title.length > 35 ? e.title.substring(0, 35) + "..." : e.title;
-      return `${shortDate} | ${e.type} | ${shortTitle} | ${e.startTime}-${e.endTime}`;
+      const shortDate = e.date || "";
+      const shortTitle = (e.title || "").length > 35 ? (e.title || "").substring(0, 35) + "..." : (e.title || "");
+      return `${shortDate} | ${e.type || ""} | ${shortTitle} | ${e.startTime || ""}-${e.endTime || ""}`;
     }).join("\n");
 
-    // 6. Chiamata all'AI SOLO per generare il testo (non per calcolare!)
+    // 6. Chiamata all'AI SOLO per generare il testo
     const openai = new OpenAI({
       apiKey: process.env.OPENAI_API_KEY,
       baseURL: "https://api.groq.com/openai/v1",
@@ -150,9 +152,9 @@ export const chatController = async (req: Request, res: Response) => {
           role: "system",
           content: `Sei SchoolAgent, un assistente preciso per un docente.
           
-          DATI GIA' CALCOLATI (NON DEVI RICALCOLARLI):
+          DATI GIA' CALCOLATI DAL SISTEMA (NON RICALCOLARLI):
           - Totale ore: ${hours} ore e ${minutes} minuti (${totalMinutes} minuti totali)
-          - Numero eventi: ${finalEvents.length}
+          - Numero eventi analizzati: ${finalEvents.length}
           
           ELENCO EVENTI INCLUSI:
           ${eventsList}
@@ -177,7 +179,7 @@ export const chatController = async (req: Request, res: Response) => {
     console.log("✅ Risposta AI generata con successo.");
     res.json({ response: aiResponse });
   } catch (error: any) {
-    console.error(" Errore CRITICO nella chat:", error.message);
+    console.error("❌ Errore CRITICO nella chat:", error.message);
     res.status(500).json({ error: "Errore interno: " + error.message });
   }
 };
