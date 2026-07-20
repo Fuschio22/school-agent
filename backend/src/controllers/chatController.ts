@@ -15,7 +15,7 @@ export const chatController = async (req: Request, res: Response) => {
     });
 
     const allEvents = circulars.flatMap(c => c.events);
-    console.log(`📊 Eventi totali nel DB: ${allEvents.length}`);
+    console.log(` Eventi totali nel DB: ${allEvents.length}`);
 
     // 2. FILTRAGGIO FLESSIBILE
     const filters: string[] = [];
@@ -54,7 +54,7 @@ export const chatController = async (req: Request, res: Response) => {
       return filters.some(f => typeLower.includes(f) || titleLower.includes(f));
     });
 
-    console.log(`✅ Eventi dopo il filtro: ${filteredEvents.length}`);
+    console.log(` Eventi dopo il filtro: ${filteredEvents.length}`);
 
     // 3. FILTRO TEMPORALE
     let finalEvents = filteredEvents;
@@ -99,11 +99,10 @@ export const chatController = async (req: Request, res: Response) => {
       console.log(`📊 Eventi nel periodo: ${finalEvents.length}`);
     }
 
-    // 4. ✅ CALCOLO PRECISO DELLE ORE NEL BACKEND (con protezione errori)
+    // 4. CALCOLO PRECISO DELLE ORE NEL BACKEND
     let totalMinutes = 0;
     
     finalEvents.forEach(e => {
-      // Se mancano gli orari, salta l'evento per evitare il crash
       if (!e.startTime || !e.endTime) {
         console.log(`⚠️ Evento saltato (orari mancanti): ${e.title}`);
         return;
@@ -131,14 +130,7 @@ export const chatController = async (req: Request, res: Response) => {
     
     console.log(`✅ CALCOLO PRECISO: ${totalMinutes} min = ${hours} ore e ${minutes} min`);
 
-    // 5. Costruiamo l'elenco eventi per la risposta
-    const eventsList = finalEvents.map(e => {
-      const shortDate = e.date || "";
-      const shortTitle = (e.title || "").length > 35 ? (e.title || "").substring(0, 35) + "..." : (e.title || "");
-      return `${shortDate} | ${e.type || ""} | ${shortTitle} | ${e.startTime || ""}-${e.endTime || ""}`;
-    }).join("\n");
-
-    // 6. Chiamata all'AI SOLO per generare il testo
+    // 5. Chiamata all'AI - SOLO per formattare, SENZA darle i dati grezzi
     const openai = new OpenAI({
       apiKey: process.env.OPENAI_API_KEY,
       baseURL: "https://api.groq.com/openai/v1",
@@ -146,24 +138,21 @@ export const chatController = async (req: Request, res: Response) => {
 
     const response = await openai.chat.completions.create({
       model: "llama-3.1-8b-instant", 
-      max_tokens: 2048,
+      max_tokens: 500,
       messages: [
         {
           role: "system",
           content: `Sei SchoolAgent, un assistente preciso per un docente.
           
-          DATI GIA' CALCOLATI DAL SISTEMA (NON RICALCOLARLI):
-          - Totale ore: ${hours} ore e ${minutes} minuti (${totalMinutes} minuti totali)
-          - Numero eventi analizzati: ${finalEvents.length}
+          IL SISTEMA HA GIA' CALCOLATO IL TOTALE. Tu devi SOLO comunicare il risultato.
           
-          ELENCO EVENTI INCLUSI:
-          ${eventsList}
-
+          DATO DA COMUNICARE (USA ESATTAMENTE QUESTO NUMERO):
+          Totale: ${hours} ore e ${minutes} minuti
+          
           ISTRUZIONI:
-          1. Usa ESATTAMENTE il totale fornito: "${hours} ore e ${minutes} minuti". NON ricalcolare.
-          2. Elenca brevemente gli eventi inclusi nel calcolo.
-          3. Usa un tono professionale e preciso.
-          4. NON inventare numeri, NON ricalcolare. Usa SOLO i dati forniti.`
+          1. Rispondi con una frase chiara che include ESATTAMENTE: "${hours} ore e ${minutes} minuti"
+          2. Non fare calcoli, non elencare eventi, non ricalcolare.
+          3. Sii breve e professionale.`
         },
         {
           role: "user",
