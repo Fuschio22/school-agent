@@ -26,6 +26,25 @@ export default function VisualCalendar({ events }: VisualCalendarProps) {
     }
   }, [events]);
 
+  // 🎹 Gestione tasto ESC per chiudere il pannello dettagli
+  useEffect(() => {
+    const handleEsc = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' || event.key === 'Esc') {
+        setSelectedDate(null);
+      }
+    };
+    
+    // Aggiungi l'ascoltatore solo quando il pannello è aperto
+    if (selectedDate) {
+      document.addEventListener('keydown', handleEsc);
+    }
+    
+    // Rimuovi l'ascoltatore quando il componente si smonta o selectedDate cambia
+    return () => {
+      document.removeEventListener('keydown', handleEsc);
+    };
+  }, [selectedDate]);
+
   const year = currentDate.getFullYear();
   const month = currentDate.getMonth();
 
@@ -143,7 +162,7 @@ export default function VisualCalendar({ events }: VisualCalendarProps) {
         <div className="mt-6 p-6 bg-gradient-to-br from-blue-50 to-indigo-50 border-2 border-blue-300 rounded-lg shadow-lg animate-in fade-in slide-in-from-bottom-2">
           <div className="flex justify-between items-center mb-4">
             <h3 className="text-xl font-bold text-blue-900">
-              📋 Eventi del {selDay}/{selMonth}/{selYear}
+               Eventi del {selDay}/{selMonth}/{selYear}
             </h3>
             <span className="bg-blue-600 text-white px-3 py-1 rounded-full text-sm font-bold">
               {selectedDayEvents.length} eventi
