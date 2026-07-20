@@ -44,18 +44,30 @@ export async function analyzeCircularText(text: string) {
            ✅ Controlla l'anno della circolare (es. "ottobre 2025").
            ✅ Se una riga ha un anno sbagliato, CORREGGILO automaticamente.
 
-        3. ORARI - REGOLA CRITICA E ASSOLUTA:
-           ✅ SE la tabella mostra SOLO l'orario di inizio (es. una colonna con "15:00", "15:45", "16:30") SENZA orario di fine:
-              → DEVI calcolare l'orario di fine aggiungendo ESATTAMENTE 45 minuti all'orario di inizio.
-              → Esempio: se vedi "15:00" → oraInizio: "15:00", oraFine: "15:45"
-              → Esempio: se vedi "15:45" → oraInizio: "15:45", oraFine: "16:30"
-              → Esempio: se vedi "16:00" → oraInizio: "16:00", oraFine: "16:45"
-              → Esempio: se vedi "16:30" → oraInizio: "16:30", oraFine: "17:15"
+        3. ORARI - REGOLA CRITICA E INTELLIGENTE:
            
-           ✅ SE la tabella mostra ENTRAMBI gli orari (es. "15:00 - 16:00" o "15:00 – 16:00"), usa quelli esatti.
+           CASO A - La tabella mostra ENTRAMBI gli orari (es. "15:00 - 16:00" o "15:00 – 16:00"):
+              → Usa quelli esatti.
+           
+           CASO B - La tabella mostra SOLO l'orario di inizio (es. "15:00", "15:30", "16:00"):
+              → DEVI calcolare la durata guardando il PATTERN degli orari nella tabella.
+              → Calcola la differenza tra l'orario di inizio di un evento e quello dell'evento SUCCESSIVO.
+              → Usa quella differenza come durata per tutti gli eventi della stessa sezione.
+              
+              ESEMPI:
+              - Se vedi: 15:00, 15:45, 16:30 → differenza = 45 minuti → durata = 45 min
+                → 15:00-15:45, 15:45-16:30, 16:30-17:15
+              
+              - Se vedi: 15:00, 15:30, 16:00 → differenza = 30 minuti → durata = 30 min
+                → 15:00-15:30, 15:30-16:00, 16:00-16:30
+              
+              - Se vedi: 14:30, 15:00, 15:30, 16:00 → differenza = 30 minuti → durata = 30 min
+                → 14:30-15:00, 15:00-15:30, 15:30-16:00, 16:00-16:30
+              
+              - Se c'è SOLO UN evento nella sezione e non puoi calcolare la differenza:
+                → Usa 45 minuti come durata di default.
            
            ✅ VERIFICA SEMPRE che oraInizio < oraFine. MAI mettere lo stesso orario per inizio e fine!
-           ✅ Se per errore metti lo stesso orario, CORREGGI aggiungendo 45 minuti all'ora di fine.
 
         4. ESTRAZIONE DA TABELLE:
            ✅ LEGGI la tabella dall'INIZIO ALLA FINE, riga per riga.
