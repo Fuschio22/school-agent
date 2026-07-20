@@ -5,11 +5,9 @@ import { prisma } from "../lib/prisma";
 export const chatController = async (req: Request, res: Response) => {
   try {
     const { message } = req.body;
-    
-    // Nota: Sostituisci "demo@schoolagent.it" con la logica di autenticazione reale se la hai
     const userEmail = "demo@schoolagent.it"; 
 
-    // 1. Recupera tutti gli eventi dell'utente per dare contesto all'AI
+    // 1. Recupera tutti gli eventi dell'utente
     const user = await prisma.user.findUnique({
       where: { email: userEmail },
       include: {
@@ -23,41 +21,54 @@ export const chatController = async (req: Request, res: Response) => {
       return res.status(404).json({ error: "Utente non trovato" });
     }
 
-    // 2. Estrai tutti gli eventi in un formato leggibile e compatto per l'AI
+    // 2. FILTRO INTELLIGENTE: Teniamo solo gli eventi rilevanti per il calcolo delle ore
     const allEvents = user.circulars.flatMap(c => c.events);
-    const eventsContext = allEvents.map(e => 
-      `- ${e.title} | Tipo: ${e.type} | Data: ${e.date} | Orario: ${e.startTime}-${e.endTime} | Sede: ${e.location} | Circ: ${e.circularNumber}`
-    ).join("\n");
+    const relevantEvents = allEvents.filter(e => 
+      e.type.toLowerCase().includes("consiglio") || 
+      e.type.toLowerCase().includes("glo") || 
+      e.type.toLowerCase().includes("collegio") || 
+      e.type.toLowerCase().includes("scrutini") ||
+      e.type.toLowerCase().includes("dipartimenti") ||
+      e.type.toLowerCase().includes("ricevimento")
+    );
+
+    // 3. COMPRESSIONE DATI: Formato ultra-leggero per restare sotto i 6000 token
+    // Prendiamo fino a 200 eventi (più che sufficienti per coprire ottobre-marzo)
+    const eventsContext = relevantEvents
+      .slice(0, 200)
+      .map(e => `${e.date} | ${e.type} | ${e.title} | ${e.startTime}-${e.endTime}`)
+      .join("\n");
 
     const openai = new OpenAI({
       apiKey: process.env.OPENAI_API_KEY,
       baseURL: "https://api.groq.com/openai/v1",
     });
 
-    // 3. Chiamata all'API usando il modello LEGGERO (8B) per risparmiare token del 70B
+    // 4. Chiamata all'API con modello leggero (8B) e istruzioni di calcolo precise
     const response = await openai.chat.completions.create({
-      model: "llama-3.1-8b-instant", // <-- MODELLO VELOCE ED EFFICIENTE PER LA CHAT
+      model: "llama-3.1-8b-instant", 
       messages: [
         {
           role: "system",
-          content: `Sei SchoolAgent, un assistente virtuale preciso e conciso per un docente. 
-          Il tuo compito è rispondere alle domande dell'utente basandoti ESCLUSIVAMENTE sui seguenti dati estratti dalle circolari.
+          content: `Sei SchoolAgent, un assistente preciso per un docente. Devi calcolare le ore di servizio per il CCNL.
           
-          DATI DISPONIBILI (Eventi):
+          DATI DEGLI EVENTI (Formato: Data | Tipo | Classe/Titolo | Orario Inizio-Fine):
           ${eventsContext}
 
-          REGOLE ASSOLUTE:
-          1. Se l'utente chiede il totale delle ore (es. "Quante ore di Consigli di Classe ho fatto?"), calcola la somma delle durate degli eventi corrispondenti.
-          2. Se un'informazione non è presente nei dati forniti, rispondi onestamente: "Non ho dati a riguardo nelle circolari caricate".
-          3. Sii diretto, professionale e usa l'italiano.
-          4. Non inventare mai dati o orari.`
+          ISTRUZIONI DI CALCOLO ASSOLUTE:
+          1. Quando l'utente chiede un totale di ore per un periodo (es. "da ottobre a marzo"), FILTRA mentalmente gli eventi di quel periodo.
+          2. Per ogni evento, calcola la durata in minuti (es. 15:00-15:45 = 45 min; 14:30-15:30 = 60 min).
+          3. Somma tutte le durate degli eventi che corrispondono alla richiesta (es. solo "Consigli di Classe" e "GLO").
+          4. Converti il totale dei minuti in ore e minuti (es. 135 min = 2 ore e 15 minuti).
+          5. Mostra il risultato finale in modo chiaro: "Totale: X ore e Y minuti".
+          6. Se non ci sono dati per quel periodo, dillo esplicitamente. Non inventare mai numeri.`
         },
         {
           role: "user",
           content: message
         }
       ],
-      temperature: 0.2, // Basso per risposte più precise e fattuali
+      temperature: 0.1, // Bassissima per massimizzare la precisione matematica
     });
 
     const aiResponse = response.choices[0]?.message?.content || "Mi dispiace, non sono riuscito a elaborare la risposta.";
@@ -66,10 +77,9 @@ export const chatController = async (req: Request, res: Response) => {
   } catch (error: any) {
     console.error("❌ Errore nella chat:", error);
     
-    // Gestione elegante dell'errore di rate limit per l'utente
     if (error.status === 429) {
       return res.status(429).json({ 
-        error: "Limite di richieste temporaneo raggiunto. Riprova tra pochi minuti." 
+        error: "Limite di richieste temporaneo raggiunto. Aspetta un minuto e riprova." 
       });
     }
     
