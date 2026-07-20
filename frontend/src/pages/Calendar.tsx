@@ -45,7 +45,7 @@ export default function Calendar() {
     fetchEvents();
   }, []);
 
-  // 🎹 NUOVO: Gestione tasto ESC per chiudere il modale
+  // 🎹 Gestione tasto ESC per chiudere il modale
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape' && selectedDay !== null) {
@@ -55,7 +55,6 @@ export default function Calendar() {
 
     window.addEventListener('keydown', handleKeyDown);
 
-    // Pulizia: rimuove l'ascoltatore quando il componente viene smontato
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
     };
@@ -235,7 +234,7 @@ export default function Calendar() {
             {/* Header del modale */}
             <div className="p-6 border-b border-slate-800 flex justify-between items-center sticky top-0 bg-slate-900 z-10">
               <h2 className="text-2xl font-bold text-white">
-                📅 Eventi del {selectedDay} {monthNames[currentDate.getMonth()]} {currentDate.getFullYear()}
+                 Eventi del {selectedDay} {monthNames[currentDate.getMonth()]} {currentDate.getFullYear()}
               </h2>
               <button 
                 onClick={() => setSelectedDay(null)}
