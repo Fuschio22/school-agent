@@ -8,7 +8,7 @@ export const chatController = async (req: Request, res: Response) => {
   try {
     const { message } = req.body;
     
-    // 1. Recuperiamo TUTTI gli eventi dal database (senza filtrare per utente demo)
+    // 1. Recuperiamo gli eventi dal database (prendiamo gli ultimi 200 per stare nel limite token)
     const circulars = await prisma.circular.findMany({
       include: { events: true }
     });
@@ -16,18 +16,8 @@ export const chatController = async (req: Request, res: Response) => {
     const allEvents = circulars.flatMap(c => c.events);
     console.log(`📊 Trovati ${allEvents.length} eventi totali nel DB.`);
 
-    // 2. FILTRO INTELLIGENTE: Teniamo solo gli eventi rilevanti per il CCNL
-    const relevantEvents = allEvents.filter(e => 
-      e.type.toLowerCase().includes("consiglio") || 
-      e.type.toLowerCase().includes("glo") || 
-      e.type.toLowerCase().includes("collegio") || 
-      e.type.toLowerCase().includes("scrutini") ||
-      e.type.toLowerCase().includes("dipartimenti") ||
-      e.type.toLowerCase().includes("ricevimento")
-    );
-
-    // 3. COMPRESSIONE DATI: Formato ultra-leggero (max 200 eventi)
-    const eventsContext = relevantEvents
+    // 2. COMPRESSIONE DATI: Formato ultra-leggero (max 200 eventi più recenti)
+    const eventsContext = allEvents
       .slice(0, 200)
       .map(e => `${e.date} | ${e.type} | ${e.title} | ${e.startTime}-${e.endTime}`)
       .join("\n");
@@ -39,31 +29,32 @@ export const chatController = async (req: Request, res: Response) => {
       baseURL: "https://api.groq.com/openai/v1",
     });
 
-    // 4. Chiamata all'API con modello leggero (8B)
+    // 3. Chiamata all'API con istruzioni RIGOROSE
     const response = await openai.chat.completions.create({
       model: "llama-3.1-8b-instant", 
       messages: [
         {
           role: "system",
-          content: `Sei SchoolAgent, un assistente preciso per un docente. Devi calcolare le ore di servizio per il CCNL.
+          content: `Sei SchoolAgent, un assistente contabile preciso e rigoroso per un docente.
           
-          DATI DEGLI EVENTI (Formato: Data | Tipo | Classe/Titolo | Orario Inizio-Fine):
+          DATI DEGLI EVENTI (Formato: Data | Tipo | Titolo/Classe | Orario Inizio-Fine):
           ${eventsContext}
 
-          ISTRUZIONI DI CALCOLO ASSOLUTE:
-          1. Quando l'utente chiede un totale di ore per un periodo, FILTRA mentalmente gli eventi di quel periodo.
-          2. Per ogni evento, calcola la durata in minuti (es. 15:00-15:45 = 45 min).
-          3. Somma tutte le durate degli eventi che corrispondono alla richiesta.
-          4. Converti il totale dei minuti in ore e minuti (es. 135 min = 2 ore e 15 minuti).
-          5. Mostra il risultato finale in modo chiaro: "Totale: X ore e Y minuti".
-          6. Se non ci sono dati per quel periodo, dillo esplicitamente. Non inventare mai numeri.`
+          ISTRUZIONI DI CALCOLO ASSOLUTE E RIGOROSE:
+          1. IDENTIFICA LA RICHIESTA: Leggi attentamente quali TIPI di evento l'utente ha chiesto ESPLICITAMENTE (es. "Consigli di Classe e GLO").
+          2. FILTRO ESCLUSIVO: Considera SOLO gli eventi il cui "Tipo" o "Titolo" corrisponde ESATTAMENTE a quanto richiesto. 
+          3. IGNORA TUTTO IL RESTO: Se l'utente non ha menzionato "Collegi", "Dipartimenti", "Scrutini" o "Ricevimenti", NON includerli nel calcolo. Devono essere completamente ignorati.
+          4. FILTRO TEMPORALE: Dei soli eventi validi, tieni solo quelli che rientrano nel periodo di date richiesto.
+          5. CALCOLO: Per ogni evento valido, calcola la durata in minuti (es. 15:00-15:45 = 45 min).
+          6. SOMMA: Somma le durate e converti il totale in ore e minuti (es. 135 min = 2 ore e 15 minuti).
+          7. OUTPUT: Mostra il risultato finale in modo chiaro: "Totale: X ore e Y minuti". Elenca brevemente gli eventi che hai incluso nel calcolo per trasparenza. Se non ce ne sono, dillo esplicitamente. NON inventare mai numeri.`
         },
         {
           role: "user",
           content: message
         }
       ],
-      temperature: 0.1,
+      temperature: 0.0, // Zero creatività, solo logica pura
     });
 
     const aiResponse = response.choices[0]?.message?.content || "Mi dispiace, non sono riuscito a elaborare la risposta.";
