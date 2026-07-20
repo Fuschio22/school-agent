@@ -24,13 +24,13 @@ export async function analyzeCircularText(text: string) {
           },
           "eventi": [
             {
-              "title": "string (es: 'Scrutini 1° Quadrimestre 4A IPSASR')",
-              "type": "string (es: 'Scrutini', 'Consigli di Classe')",
+              "title": "string (es: 'Consiglio di Classe 5A IPSASR')",
+              "type": "string (es: 'Consigli di Classe', 'Scrutini')",
               "sede": "string (Nome COMPLETO dell'istituto)",
               "data": "DD/MM/YYYY",
               "oraInizio": "HH:MM",
               "oraFine": "HH:MM",
-              "classe": "string (es: '4A IPSASR', '1AS', 'Tutte' se evento generale)"
+              "classe": "string (es: '5A IPSASR', '1AS', 'Tutte' se evento generale)"
             }
           ],
           "ordineDelGiorno": ["array di stringhe"]
@@ -40,18 +40,16 @@ export async function analyzeCircularText(text: string) {
 
         1. ORDINE DEL GIORNO: Estrai tutti i punti numerati nell'array "ordineDelGiorno".
 
-        2. ESTRAZIONE DA TABELLE - REGOLA D'ORO:
-           ✅ LEGGI la tabella dall'INIZIO ALLA FINE, riga per riga.
-           ✅ Crea UN evento per OGNI SINGOLA RIGA della tabella.
-           ✅ Se la sezione è "Istituto Professionale per l'Agricoltura" (IPSASR), aggiungi " IPSASR" al campo "classe" (es: "1A" → "1A IPSASR").
-           ✅ Se la sezione è "Liceo Scientifico di Siniscola", aggiungi "S" alla sezione (es: "1A" → "1AS").
-           ✅ Se la sezione è "Liceo Scientifico di Dorgali" o "ITTL", NON aggiungere nulla.
-           ✅ Estrai il nome dell'istituto ESATTAMENTE come scritto nella tabella.
+        2. COERENZA DELLE DATE - REGOLA CRITICA:
+           ✅ Controlla l'anno della circolare (es. "ottobre 2025").
+           ✅ Se una riga della tabella ha un anno palesemente sbagliato (es. 2024 in una circolare del 2025), CORREGGILO automaticamente usando l'anno della circolare.
+           ✅ NON generare date con anni passati o futuri di 10 anni rispetto al contesto della circolare.
 
-        3. NORMALIZZAZIONE CLASSI:
-           - Rimuovi "^" (es: "1^A" → "1A").
-           - Per il Liceo: aggiungi "S" (es: "1A" → "1AS").
-           - Per IPSASR: mantieni "1A IPSASR", "4A IPSASR".
+        3. ESTRAZIONE DA TABELLE:
+           ✅ LEGGI la tabella dall'INIZIO ALLA FINE, riga per riga.
+           ✅ Crea UN evento per OGNI SINGOLA RIGA.
+           ✅ Se la sezione è "Istituto Professionale per l'Agricoltura" (IPSASR), aggiungi " IPSASR" al campo "classe" (es: "5A" → "5A IPSASR").
+           ✅ Se la sezione è "Liceo Scientifico", aggiungi "S" alla sezione (es: "1A" → "1AS").
 
         4. Restituisci SOLO JSON valido. Niente markdown, niente testo extra.`
       },
