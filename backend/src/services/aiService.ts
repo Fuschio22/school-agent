@@ -24,13 +24,13 @@ export async function analyzeCircularText(text: string) {
           },
           "eventi": [
             {
-              "title": "string (es: 'Colloqui Scuola-Famiglia Liceo Scientifico Siniscola')",
-              "type": "string (es: 'Colloqui Scuola-Famiglia', 'Consigli di Classe', 'Scrutini')",
-              "sede": "string (Nome COMPLETO dell'istituto, es: 'Istituto Professionale per l'Agricoltura')",
+              "title": "string (es: 'Scrutini 1° Quadrimestre 4A IPSASR')",
+              "type": "string (es: 'Scrutini', 'Consigli di Classe')",
+              "sede": "string (Nome COMPLETO dell'istituto)",
               "data": "DD/MM/YYYY",
               "oraInizio": "HH:MM",
               "oraFine": "HH:MM",
-              "classe": "string (es: '1AS', 'Tutte' se evento generale)"
+              "classe": "string (es: '4A IPSASR', '1AS', 'Tutte' se evento generale)"
             }
           ],
           "ordineDelGiorno": ["array di stringhe"]
@@ -43,14 +43,15 @@ export async function analyzeCircularText(text: string) {
         2. ESTRAZIONE DA TABELLE - REGOLA D'ORO:
            ✅ LEGGI la tabella dall'INIZIO ALLA FINE, riga per riga.
            ✅ Crea UN evento per OGNI SINGOLA RIGA della tabella.
-           ✅ NON saltare nessuna riga, anche se contiene ITTL o Dorgali.
+           ✅ Se la sezione è "Istituto Professionale per l'Agricoltura" (IPSASR), aggiungi " IPSASR" al campo "classe" (es: "1A" → "1A IPSASR").
+           ✅ Se la sezione è "Liceo Scientifico di Siniscola", aggiungi "S" alla sezione (es: "1A" → "1AS").
+           ✅ Se la sezione è "Liceo Scientifico di Dorgali" o "ITTL", NON aggiungere nulla.
            ✅ Estrai il nome dell'istituto ESATTAMENTE come scritto nella tabella.
-           ✅ Se la riga non specifica classi, usa "classe": "Tutte".
 
         3. NORMALIZZAZIONE CLASSI:
            - Rimuovi "^" (es: "1^A" → "1A").
-           - Liceo Scientifico: aggiungi "S" (es: "1A" → "1AS").
-           - IPSASR: mantieni "1A IPSASR", "4A IPSASR".
+           - Per il Liceo: aggiungi "S" (es: "1A" → "1AS").
+           - Per IPSASR: mantieni "1A IPSASR", "4A IPSASR".
 
         4. Restituisci SOLO JSON valido. Niente markdown, niente testo extra.`
       },
