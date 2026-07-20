@@ -7,6 +7,7 @@ export const chatController = async (req: Request, res: Response) => {
   
   try {
     const { message } = req.body;
+    const messageLower = message.toLowerCase();
     
     // 1. Recuperiamo gli eventi dal database
     const circulars = await prisma.circular.findMany({
@@ -16,73 +17,131 @@ export const chatController = async (req: Request, res: Response) => {
     const allEvents = circulars.flatMap(c => c.events);
     console.log(`📊 Eventi totali nel DB: ${allEvents.length}`);
 
-    // 2. FILTRO: Teniamo solo gli eventi rilevanti per il CCNL
-    const relevantEvents = allEvents.filter(e => 
-      e.type.toLowerCase().includes("consiglio") || 
-      e.type.toLowerCase().includes("glo") || 
-      e.type.toLowerCase().includes("gruppo") ||
-      e.type.toLowerCase().includes("collegio") || 
-      e.type.toLowerCase().includes("scrutini") ||
-      e.type.toLowerCase().includes("dipartimenti") ||
-      e.type.toLowerCase().includes("ricevimento")
-    );
+    // 2. FILTRAGGIO DETERMINISTICO NEL BACKEND (non nell'AI!)
+    // Analizziamo la domanda dell'utente per capire quali tipi di evento includere
+    const filters: string[] = [];
+    
+    // Rileva i tipi di evento richiesti nella domanda
+    if (messageLower.includes("consiglio di classe") || messageLower.includes("cdc")) {
+      filters.push("consiglio");
+    }
+    if (messageLower.includes("glo") || messageLower.includes("gruppo di lavoro")) {
+      filters.push("glo");
+      filters.push("gruppo");
+    }
+    if (messageLower.includes("collegio")) {
+      filters.push("collegio");
+    }
+    if (messageLower.includes("dipartiment")) {
+      filters.push("dipartiment");
+    }
+    if (messageLower.includes("scrutini")) {
+      filters.push("scrutini");
+    }
+    if (messageLower.includes("riceviment")) {
+      filters.push("riceviment");
+    }
 
-    console.log(`📊 Eventi rilevanti trovati: ${relevantEvents.length}`);
+    // Se non ha specificato nulla, includi tutto
+    if (filters.length === 0) {
+      filters.push("consiglio", "glo", "gruppo", "collegio", "dipartiment", "scrutini", "riceviment");
+    }
 
-    // 3. COMPRESSIONE ESTREMA: Ordiniamo dal più VECCHIO al più RECENTE (cronologico)
-    const eventsContext = relevantEvents
-      .sort((a, b) => {
-        // Ordina per data crescente (più vecchio prima)
-        const [dA, mA, yA] = a.date.split('/').map(Number);
-        const [dB, mB, yB] = b.date.split('/').map(Number);
-        return new Date(yA, mA - 1, dA).getTime() - new Date(yB, mB - 1, dB).getTime();
-      })
-      .slice(0, 400) 
+    console.log(`🔍 Filtri applicati: ${filters.join(", ")}`);
+
+    // Applica il filtro agli eventi
+    const filteredEvents = allEvents.filter(e => {
+      const typeLower = e.type.toLowerCase();
+      const titleLower = e.title.toLowerCase();
+      return filters.some(f => typeLower.includes(f) || titleLower.includes(f));
+    });
+
+    console.log(` Eventi dopo il filtro: ${filteredEvents.length}`);
+
+    // 3. FILTRO TEMPORALE (se l'utente specifica un periodo)
+    let finalEvents = filteredEvents;
+    
+    // Rileva il periodo dalla domanda (es. "da ottobre 2025 a marzo 2026")
+    const monthMap: Record<string, number> = {
+      "gennaio": 1, "febbraio": 2, "marzo": 3, "aprile": 4,
+      "maggio": 5, "giugno": 6, "luglio": 7, "agosto": 8,
+      "settembre": 9, "ottobre": 10, "novembre": 11, "dicembre": 12
+    };
+
+    // Estrai mesi e anni dalla domanda
+    const monthsFound: { month: number; year: number }[] = [];
+    for (const [monthName, monthNum] of Object.entries(monthMap)) {
+      if (messageLower.includes(monthName)) {
+        // Cerca l'anno vicino al nome del mese
+        const yearMatch = message.match(/(\d{4})/g);
+        if (yearMatch) {
+          for (const year of yearMatch) {
+            monthsFound.push({ month: monthNum, year: parseInt(year) });
+          }
+        }
+      }
+    }
+
+    // Se abbiamo trovato un periodo, filtra gli eventi
+    if (monthsFound.length >= 2) {
+      // Ordina i mesi trovati per data
+      monthsFound.sort((a, b) => {
+        if (a.year !== b.year) return a.year - b.year;
+        return a.month - b.month;
+      });
+
+      const startDate = monthsFound[0];
+      const endDate = monthsFound[monthsFound.length - 1];
+
+      console.log(`📅 Periodo richiesto: ${startDate.month}/${startDate.year} - ${endDate.month}/${endDate.year}`);
+
+      finalEvents = filteredEvents.filter(e => {
+        const [day, month, year] = e.date.split('/').map(Number);
+        const eventDate = new Date(year, month - 1, day);
+        const start = new Date(startDate.year, startDate.month - 1, 1);
+        const end = new Date(endDate.year, endDate.month, 0); // Ultimo giorno del mese
+        return eventDate >= start && eventDate <= end;
+      });
+
+      console.log(`📊 Eventi nel periodo: ${finalEvents.length}`);
+    }
+
+    // 4. COMPRESSIONE: Formato compatto per l'AI
+    const eventsContext = finalEvents
+      .slice(0, 400)
       .map(e => {
-        // Accorcia la data: 14/10/2025 -> 14/10/25
         const shortDate = e.date.length >= 8 ? `${e.date.slice(0, 5)}/${e.date.slice(-2)}` : e.date;
-        
-        // Accorcia il tipo
-        let shortType = "ALTRO";
-        const typeLower = e.type.toLowerCase();
-        if (typeLower.includes("consiglio")) shortType = "CDC";
-        else if (typeLower.includes("glo") || typeLower.includes("gruppo")) shortType = "GLO";
-        else if (typeLower.includes("collegio")) shortType = "CD";
-        else if (typeLower.includes("dipartimenti")) shortType = "DIP";
-        else if (typeLower.includes("scrutini")) shortType = "SCR";
-
-        // Accorcia il titolo se è troppo lungo
-        const shortTitle = e.title.length > 35 ? e.title.substring(0, 35) + "..." : e.title;
-
-        return `${shortDate} | ${shortType} | ${shortTitle} | ${e.startTime}-${e.endTime}`;
+        const shortTitle = e.title.length > 30 ? e.title.substring(0, 30) + "..." : e.title;
+        return `${shortDate} | ${e.type} | ${shortTitle} | ${e.startTime}-${e.endTime}`;
       })
       .join("\n");
 
-    console.log("🤖 Chiamata a Groq API in corso...");
+    console.log(" Chiamata a Groq API in corso...");
 
     const openai = new OpenAI({
       apiKey: process.env.OPENAI_API_KEY,
       baseURL: "https://api.groq.com/openai/v1",
     });
 
-    // 4. Chiamata all'API con istruzioni RIGOROSE
+    // 5. Chiamata all'API - ORA L'AI DEVE SOLO FARE LA SOMMA MATEMATICA
     const response = await openai.chat.completions.create({
       model: "llama-3.1-8b-instant", 
       messages: [
         {
           role: "system",
-          content: `Sei SchoolAgent, un assistente contabile preciso e rigoroso per un docente.
+          content: `Sei un assistente contabile preciso. Devi SOLO calcolare la somma delle durate degli eventi forniti.
           
-          DATI DEGLI EVENTI (Formato: Data | Tipo | Titolo/Classe | Orario):
+          DATI DEGLI EVENTI (Formato: Data | Tipo | Titolo | Orario Inizio-Fine):
           ${eventsContext}
 
-          ISTRUZIONI DI CALCOLO ASSOLUTE E RIGOROSE:
-          1. IDENTIFICA LA RICHIESTA: Leggi quali TIPI di evento e/o CLASSI l'utente ha chiesto ESPLICITAMENTE.
-          2. FILTRO ESCLUSIVO: Considera SOLO gli eventi che corrispondono ESATTAMENTE. Se l'utente chiede "Consigli e GLO", IGNORA totalmente Collegi (CD), Dipartimenti (DIP) e Scrutini (SCR).
-          3. FILTRO TEMPORALE: Tieni solo gli eventi nel periodo di date richiesto.
-          4. CALCOLO: Per ogni evento valido, calcola la durata in minuti (es. 15:00-15:45 = 45 min).
-          5. SOMMA: Somma le durate e converti in ore e minuti.
-          6. OUTPUT: Mostra il risultato: "Totale: X ore e Y minuti". Elenca brevemente gli eventi inclusi in ordine cronologico. Se una classe specifica (es. 5A IPSASR) è richiesta ma non presente nei dati, dillo esplicitamente: "Attenzione: non trovo eventi per la 5A IPSASR nei dati forniti". NON inventare mai numeri.`
+          ISTRUZIONI:
+          1. Per ogni evento, calcola la durata in minuti (es. 15:00-15:45 = 45 min).
+          2. Somma tutte le durate.
+          3. Converti il totale in ore e minuti (es. 135 min = 2 ore e 15 minuti).
+          4. Rispondi con: "Totale: X ore e Y minuti".
+          5. Elenca brevemente gli eventi inclusi nel calcolo.
+          
+          NON filtrare, NON ignorare eventi, NON aggiungere eventi. Usa SOLO i dati forniti.`
         },
         {
           role: "user",
