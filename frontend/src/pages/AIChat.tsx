@@ -1,7 +1,5 @@
 import { useState } from "react";
 
-// ⚠️ IMPORTANTE: Sostituisci questo URL con l'URL effettivo del tuo backend su Render 
-// (es. "https://school-agent-backend.onrender.com") se non hai una variabile d'ambiente configurata.
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "https://school-agent-backend.onrender.com";
 
 type Message = {
@@ -36,10 +34,13 @@ export default function AIChat() {
 
       const data = await response.json();
 
-      if (data.answer) {
-        setMessages((prev) => [...prev, { role: "assistant", content: data.answer }]);
+      // ✅ CORRETTO: Il backend invia "response", non "answer"
+      if (data.response) {
+        setMessages((prev) => [...prev, { role: "assistant", content: data.response }]);
       } else {
-        setMessages((prev) => [...prev, { role: "assistant", content: "Mi dispiace, c'è stato un errore nell'elaborazione." }]);
+        // Mostriamo l'errore specifico se il backend lo invia
+        const errorMsg = data.error || "Mi dispiace, c'è stato un errore nell'elaborazione.";
+        setMessages((prev) => [...prev, { role: "assistant", content: errorMsg }]);
       }
     } catch (error) {
       console.error("Errore chat:", error);
@@ -78,7 +79,7 @@ export default function AIChat() {
               <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce"></div>
               <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: "0.1s" }}></div>
               <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: "0.2s" }}></div>
-              <span className="ml-2 text-sm">SchoolAgent sta leggendo il database...</span>
+              <span className="ml-2 text-sm">SchoolAgent sta calcolando...</span>
             </div>
           </div>
         )}
