@@ -40,18 +40,26 @@ export async function analyzeCircularText(text: string) {
 
         1. ORDINE DEL GIORNO: Estrai tutti i punti numerati nell'array "ordineDelGiorno".
 
-        2. COERENZA DELLE DATE - REGOLA CRITICA:
+        2. COERENZA DELLE DATE:
            ✅ Controlla l'anno della circolare (es. "ottobre 2025").
-           ✅ Se una riga della tabella ha un anno palesemente sbagliato (es. 2024 in una circolare del 2025), CORREGGILO automaticamente usando l'anno della circolare.
-           ✅ NON generare date con anni passati o futuri di 10 anni rispetto al contesto della circolare.
+           ✅ Se una riga ha un anno sbagliato, CORREGGILO automaticamente.
 
-        3. ESTRAZIONE DA TABELLE:
+        3. ORARI - REGOLA CRITICA:
+           ✅ Se la tabella mostra SOLO l'orario di inizio (es. "15:00", "15:45", "16:30") senza orario di fine:
+              → Calcola l'orario di fine aggiungendo **45 minuti** all'orario di inizio.
+              → Esempio: "15:00" → oraInizio: "15:00", oraFine: "15:45"
+              → Esempio: "15:45" → oraInizio: "15:45", oraFine: "16:30"
+              → Esempio: "16:30" → oraInizio: "16:30", oraFine: "17:15"
+           ✅ Se la tabella mostra ENTRAMBI gli orari (es. "15:00 - 16:00"), usa quelli.
+           ✅ VERIFICA SEMPRE che oraInizio < oraFine. MAI invertire gli orari!
+
+        4. ESTRAZIONE DA TABELLE:
            ✅ LEGGI la tabella dall'INIZIO ALLA FINE, riga per riga.
            ✅ Crea UN evento per OGNI SINGOLA RIGA.
-           ✅ Se la sezione è "Istituto Professionale per l'Agricoltura" (IPSASR), aggiungi " IPSASR" al campo "classe" (es: "5A" → "5A IPSASR").
+           ✅ Se la sezione è "Istituto Professionale per l'Agricoltura" (IPSASR), aggiungi " IPSASR" al campo "classe".
            ✅ Se la sezione è "Liceo Scientifico", aggiungi "S" alla sezione (es: "1A" → "1AS").
 
-        4. Restituisci SOLO JSON valido. Niente markdown, niente testo extra.`
+        5. Restituisci SOLO JSON valido. Niente markdown, niente testo extra.`
       },
       {
         role: "user",
@@ -62,6 +70,6 @@ export async function analyzeCircularText(text: string) {
   });
 
   const content = response.choices[0]?.message?.content || "{}";
-  console.log("🤖 RAW AI JSON OUTPUT:", content);
+  console.log(" RAW AI JSON OUTPUT:", content);
   return JSON.parse(content);
 }

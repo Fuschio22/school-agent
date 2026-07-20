@@ -25,7 +25,7 @@ function extractMonthYear(text: string): { month: string; year: string } | null 
   return null;
 }
 
-// Funzione per verificare se è una rettifica (AMPLIATA per includere calendari definitivi)
+// Funzione per verificare se è una rettifica
 function isRettifica(text: string): boolean {
   const lowerText = text.toLowerCase();
   return lowerText.includes("rettifica") || 
@@ -75,7 +75,35 @@ export const analyzeCircularController = async (req: Request, res: Response) => 
 
     // 🌟 NUOVO: Applichiamo il filtro passando le classi dinamiche dell'utente
     const filteredEventsData = filterEvents(eventsData, userClasses);
-    console.log(`🔍 Filtro applicato: da ${eventsData.length} eventi estratti a ${filteredEventsData.length} eventi permessi.`);
+
+    // 🛡️ VALIDAZIONE: Correggi orari invertiti
+    const validatedEventsData = filteredEventsData.map((event: any) => {
+      if (event.oraInizio && event.oraFine) {
+        const [hInizio, mInizio] = event.oraInizio.split(':').map(Number);
+        const [hFine, mFine] = event.oraFine.split(':').map(Number);
+        
+        const minutiInizio = hInizio * 60 + mInizio;
+        const minutiFine = hFine * 60 + mFine;
+        
+        // Se l'ora di fine è prima o uguale all'inizio, aggiungi 45 minuti all'inizio
+        if (minutiFine <= minutiInizio) {
+          const nuoviMinutiFine = minutiInizio + 45;
+          const nuoveOre = Math.floor(nuoviMinutiFine / 60);
+          const nuoviMinuti = nuoviMinutiFine % 60;
+          const nuovaOraFine = `${nuoveOre.toString().padStart(2, '0')}:${nuoviMinuti.toString().padStart(2, '0')}`;
+          
+          console.log(`⚠️ Corretto orario invertito per ${event.classe}: ${event.oraFine} → ${nuovaOraFine}`);
+          
+          return {
+            ...event,
+            oraFine: nuovaOraFine
+          };
+        }
+      }
+      return event;
+    });
+
+    console.log(`🔍 Filtro applicato: da ${eventsData.length} eventi estratti a ${validatedEventsData.length} eventi permessi.`);
 
     const numeroCircolare = String(circData.numero || "");
     const dataCircolare = String(circData.data || "");
@@ -141,7 +169,7 @@ export const analyzeCircularController = async (req: Request, res: Response) => 
 
     // Se esistono eventi da cancellare (rettifica), cancellali
     if (eventsToDelete.length > 0) {
-      console.log(`🗑️ Cancello ${eventsToDelete.length} eventi vecchi`);
+      console.log(`️ Cancello ${eventsToDelete.length} eventi vecchi`);
       await prisma.event.deleteMany({
         where: { id: { in: eventsToDelete } }
       });
@@ -169,7 +197,7 @@ export const analyzeCircularController = async (req: Request, res: Response) => 
           summary: orderOfDay.length > 0 ? orderOfDay.join("\n") : existingCircular.summary,
           text: text,
           events: {
-            create: filteredEventsData.map((event: any) => ({
+            create: validatedEventsData.map((event: any) => ({
               title: event.title || `${event.classe || "Classe"} - ${event.sede || "Sede"}`,
               type: event.type || "Consigli di Classe",
               date: String(event.data || ""),
@@ -202,7 +230,7 @@ export const analyzeCircularController = async (req: Request, res: Response) => 
         text: text,
         userId: user.id,
         events: {
-          create: filteredEventsData.map((event: any) => ({
+          create: validatedEventsData.map((event: any) => ({
             title: event.title || `${event.classe || "Classe"} - ${event.sede || "Sede"}`,
             type: event.type || "Consigli di Classe",
             date: String(event.data || ""),
