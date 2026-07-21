@@ -1,4 +1,5 @@
-import { Bell, UserCircle2 } from "lucide-react";
+import NotificationCenter from "../NotificationCenter";
+import UserButton from "../UserButton";
 
 export default function Header() {
   return (
@@ -7,8 +8,8 @@ export default function Header() {
       <div className="w-64"></div>
 
       <div className="flex items-center gap-5">
-        <Bell />
-        <UserCircle2 size={34} />
+        <NotificationCenter />
+        <UserButton />
       </div>
     </header>
   );

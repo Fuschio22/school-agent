@@ -6,6 +6,7 @@ import Header from "./components/layout/Header";
 
 import Dashboard from "./pages/Dashboard";
 import Circulars from "./pages/Circulars";
+import Lessons from "./pages/Lessons";  // ✅ AGGIUNTO
 import Calendar from "./pages/Calendar";
 import Hours from "./pages/Hours";
 import AIChat from "./pages/AIChat";
@@ -24,6 +25,11 @@ export default function App() {
           <Route
             path="/circulars"
             element={<Circulars />}
+          />
+
+          <Route
+            path="/lessons"
+            element={<Lessons />}
           />
 
           <Route
