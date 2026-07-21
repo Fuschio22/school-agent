@@ -54,8 +54,8 @@ export default function Dashboard() {
     fetchData();
   }, []);
 
-  // ✅ FUNZIONE PER CALCOLARE LE ORE REALI
-  const calculateHours = (eventList: Event[]) => {
+  // ✅ FUNZIONE PER CALCOLARE I MINUTI TOTALI (per uso interno)
+  const calculateMinutes = (eventList: Event[]) => {
     let totalMinutes = 0;
     eventList.forEach(e => {
       if (e.startTime && e.endTime) {
@@ -69,29 +69,25 @@ export default function Dashboard() {
         }
       }
     });
+    return totalMinutes;
+  };
+
+  // ✅ FUNZIONE PER FORMATTAZIONE ORE (per display)
+  const formatHours = (totalMinutes: number) => {
     const hours = Math.floor(totalMinutes / 60);
     const minutes = totalMinutes % 60;
     return minutes > 0 ? `${hours}h ${minutes}m` : `${hours}h`;
   };
 
-  // ✅ FILTRI FLESSIBILI PER OGNI CATEGORIA
-  const cdcEvents = events.filter(e => 
-    e.type.toLowerCase().includes("consiglio") || 
-    e.title.toLowerCase().includes("consiglio")
-  );
-  const cdcHoursStr = calculateHours(cdcEvents);
+  // ✅ FILTRI FLESSIBILI
+  const cdcEvents = events.filter(e => e.type.toLowerCase().includes("consiglio") || e.title.toLowerCase().includes("consiglio"));
+  const cdcMinutes = calculateMinutes(cdcEvents);
   
-  const collegiEvents = events.filter(e => 
-    e.type.toLowerCase().includes("collegio") || 
-    e.title.toLowerCase().includes("collegio")
-  );
-  const collegiHoursStr = calculateHours(collegiEvents);
+  const collegiEvents = events.filter(e => e.type.toLowerCase().includes("collegio") || e.title.toLowerCase().includes("collegio"));
+  const collegiMinutes = calculateMinutes(collegiEvents);
   
-  const dipartimentiEvents = events.filter(e => 
-    e.type.toLowerCase().includes("dipartiment") || 
-    e.title.toLowerCase().includes("dipartiment")
-  );
-  const dipartimentiHoursStr = calculateHours(dipartimentiEvents);
+  const dipartimentiEvents = events.filter(e => e.type.toLowerCase().includes("dipartiment") || e.title.toLowerCase().includes("dipartiment"));
+  const dipartimentiMinutes = calculateMinutes(dipartimentiEvents);
   
   const gloEvents = events.filter(e => 
     e.type.toLowerCase().includes("glo") || 
@@ -99,9 +95,8 @@ export default function Dashboard() {
     e.type.toLowerCase().includes("gruppo di lavoro") ||
     e.title.toLowerCase().includes("gruppo di lavoro")
   );
-  const gloHoursStr = calculateHours(gloEvents);
+  const gloMinutes = calculateMinutes(gloEvents);
   
-  // ✅ FILTRO CORRETTO PER COLLOQUI (include "Scuola-Famiglia")
   const colloquiEvents = events.filter(e => 
     e.type.toLowerCase().includes("colloquio") || 
     e.title.toLowerCase().includes("colloquio") ||
@@ -110,13 +105,30 @@ export default function Dashboard() {
     e.type.toLowerCase().includes("famiglia") ||
     e.title.toLowerCase().includes("famiglia")
   );
-  const colloquiHoursStr = calculateHours(colloquiEvents);
+  const colloquiMinutes = calculateMinutes(colloquiEvents);
+
+  // ✅ CALCOLO SOGLIA CCNL
+  // 40 ore totali / 18 classi totali * 12 tue classi = 26.666 ore = 1600 minuti
+  const TARGET_CCNL_MINUTES = Math.round((40 / 18) * 12 * 60); // 1600 minuti
+  const currentCCNLMinutes = cdcMinutes + gloMinutes;
+  const percentageCCNL = Math.min(100, Math.round((currentCCNLMinutes / TARGET_CCNL_MINUTES) * 100));
+  
+  // Determina il colore della barra in base alla percentuale
+  let progressColor = "bg-blue-500";
+  let statusText = "In corso";
+  if (percentageCCNL >= 100) {
+    progressColor = "bg-green-500";
+    statusText = "Obiettivo raggiunto! 🎉";
+  } else if (percentageCCNL >= 80) {
+    progressColor = "bg-yellow-500";
+    statusText = "Quasi completato";
+  }
 
   // Statistiche generali
   const totalCirculars = circulars.length;
   const totalEvents = events.length;
   
-  // Prossimi eventi (futuri)
+  // Prossimi eventi
   const today = new Date();
   const upcomingEvents = events
     .filter(event => {
@@ -153,6 +165,39 @@ export default function Dashboard() {
         </p>
       </div>
 
+      {/* ✅ NUOVA CARD: STATO CCNL */}
+      <div className="rounded-2xl bg-slate-900 p-6 border border-slate-800">
+        <div className="flex flex-col md:flex-row md:items-center justify-between mb-4">
+          <div>
+            <h2 className="text-xl font-bold text-white flex items-center gap-2">
+              <span>⚖️</span> Stato Obblighi CCNL (CDC + GLO)
+            </h2>
+            <p className="text-sm text-slate-400 mt-1">
+              Soglia calcolata: 40h ÷ 18 classi × 12 tue classi = <span className="text-white font-semibold">26h 40m</span>
+            </p>
+          </div>
+          <div className="mt-2 md:mt-0 text-right">
+            <p className="text-3xl font-bold text-white">{formatHours(currentCCNLMinutes)}</p>
+            <p className="text-xs text-slate-400">su {formatHours(TARGET_CCNL_MINUTES)} richieste</p>
+          </div>
+        </div>
+        
+        {/* Barra di Progresso */}
+        <div className="w-full bg-slate-800 rounded-full h-4 mb-2 overflow-hidden">
+          <div 
+            className={`h-4 rounded-full ${progressColor} transition-all duration-500 ease-out`}
+            style={{ width: `${percentageCCNL}%` }}
+          ></div>
+        </div>
+        
+        <div className="flex justify-between items-center text-sm">
+          <span className={`font-semibold ${percentageCCNL >= 100 ? 'text-green-400' : 'text-blue-400'}`}>
+            {percentageCCNL}% completato
+          </span>
+          <span className="text-slate-400">{statusText}</span>
+        </div>
+      </div>
+
       {/* Card Statistiche Principali */}
       <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
         <Card
@@ -171,29 +216,29 @@ export default function Dashboard() {
         />
         <Card
           title="Ore Consigli di Classe"
-          value={cdcHoursStr}
-          subtitle="Calcolo preciso"
+          value={formatHours(cdcMinutes)}
+          subtitle={`${cdcEvents.length} eventi`}
           color="bg-purple-500"
           icon="👥"
         />
         <Card
           title="Ore GLO"
-          value={gloHoursStr}
-          subtitle="Gruppi di Lavoro"
+          value={formatHours(gloMinutes)}
+          subtitle={`${gloEvents.length} eventi`}
           color="bg-cyan-500"
-          icon=""
+          icon="🤝"
         />
         <Card
           title="Ore Collegi Docenti"
-          value={collegiHoursStr}
-          subtitle="Calcolo preciso"
+          value={formatHours(collegiMinutes)}
+          subtitle={`${collegiEvents.length} eventi`}
           color="bg-orange-500"
           icon="🏛️"
         />
         <Card
           title="Ore Dipartimenti"
-          value={dipartimentiHoursStr}
-          subtitle="Calcolo preciso"
+          value={formatHours(dipartimentiMinutes)}
+          subtitle={`${dipartimentiEvents.length} eventi`}
           color="bg-emerald-500"
           icon="📚"
         />
@@ -209,37 +254,37 @@ export default function Dashboard() {
           <EventTypeCard
             type="Consigli di Classe"
             count={cdcEvents.length}
-            hours={cdcHoursStr}
+            hours={formatHours(cdcMinutes)}
             color="bg-purple-500"
             icon="👥"
           />
           <EventTypeCard
             type="GLO"
             count={gloEvents.length}
-            hours={gloHoursStr}
+            hours={formatHours(gloMinutes)}
             color="bg-cyan-500"
-            icon="🤝"
+            icon=""
           />
           <EventTypeCard
             type="Collegio dei Docenti"
             count={collegiEvents.length}
-            hours={collegiHoursStr}
+            hours={formatHours(collegiMinutes)}
             color="bg-orange-500"
             icon="🏛️"
           />
           <EventTypeCard
             type="Dipartimenti"
             count={dipartimentiEvents.length}
-            hours={dipartimentiHoursStr}
+            hours={formatHours(dipartimentiMinutes)}
             color="bg-emerald-500"
-            icon="📚"
+            icon=""
           />
           <EventTypeCard
             type="Colloqui/Ricevimenti"
             count={colloquiEvents.length}
-            hours={colloquiHoursStr}
+            hours={formatHours(colloquiMinutes)}
             color="bg-pink-500"
-            icon="💬"
+            icon=""
           />
         </div>
       </div>
@@ -262,11 +307,11 @@ export default function Dashboard() {
                 <div key={event.id} className="flex items-center justify-between p-4 bg-slate-800 rounded-lg border border-slate-700">
                   <div className="flex items-center gap-4">
                     <div className="text-2xl">
-                      {event.type.toLowerCase().includes("consiglio") ? "" : 
+                      {event.type.toLowerCase().includes("consiglio") ? "👥" : 
                        event.type.toLowerCase().includes("collegio") ? "🏛️" : 
                        event.type.toLowerCase().includes("glo") ? "🤝" : 
                        event.type.toLowerCase().includes("dipartiment") ? "📚" : 
-                       event.type.toLowerCase().includes("colloquio") || event.type.toLowerCase().includes("famiglia") ? "💬" : "📌"}
+                       event.type.toLowerCase().includes("colloquio") || event.type.toLowerCase().includes("famiglia") ? "" : "📌"}
                     </div>
                     <div>
                       <h3 className="font-semibold text-white">{event.title}</h3>
@@ -305,7 +350,7 @@ export default function Dashboard() {
               </div>
               <div className="p-4 bg-blue-600/20 rounded-lg border border-blue-600/30">
                 <p className="text-sm text-blue-300">
-                  📊 {lastCircular.events?.length || 0} eventi estratti
+                   {lastCircular.events?.length || 0} eventi estratti
                 </p>
               </div>
             </div>
