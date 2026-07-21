@@ -111,7 +111,9 @@ export default function Dashboard() {
   const TARGET_CCNL_MINUTES = Math.round((40 / 18) * 12 * 60); // 1600 minuti = 26h 40m
   const currentCCNLMinutes = cdcMinutes + gloMinutes;
   const remainingMinutes = TARGET_CCNL_MINUTES - currentCCNLMinutes;
-  const percentageCCNL = Math.min(100, Math.round((currentCCNLMinutes / TARGET_CCNL_MINUTES) * 100));
+  
+  // ✅ RIMOSSO Math.min(100, ...) - ORA PUÒ SUPERARE IL 100%
+  const percentageCCNL = Math.round((currentCCNLMinutes / TARGET_CCNL_MINUTES) * 100);
   
   // ✅ SISTEMA DI AVVISI DINAMICI
   let alertType = "info"; // info, warning, success, danger
@@ -136,7 +138,7 @@ export default function Dashboard() {
   } else {
     // Ha superato la soglia
     alertType = "danger";
-    alertMessage = `🚨 HAI SUPERATO l'obbligo CCNL di ${formatHours(Math.abs(remainingMinutes))}!`;
+    alertMessage = ` HAI SUPERATO l'obbligo CCNL di ${formatHours(Math.abs(remainingMinutes))}!`;
     alertIcon = "🚨";
   }
 
@@ -181,7 +183,7 @@ export default function Dashboard() {
         </p>
       </div>
 
-      {/* ✅ BANNER DI AVVISO CCNL */}
+      {/* ✅ BANNER DI AVVISO CCNL - BARRA DINAMICA OLTRE 100% */}
       <div className={`rounded-2xl p-6 border-2 ${
         alertType === "info" ? "bg-blue-900/20 border-blue-500" :
         alertType === "warning" ? "bg-yellow-900/20 border-yellow-500" :
@@ -210,7 +212,7 @@ export default function Dashboard() {
           </div>
         </div>
         
-        {/* Barra di Progresso */}
+        {/* Barra di Progresso - PUÒ SUPERARE IL 100% */}
         <div className="mt-4 w-full bg-slate-800 rounded-full h-3 overflow-hidden">
           <div 
             className={`h-3 rounded-full transition-all duration-500 ${
@@ -219,7 +221,7 @@ export default function Dashboard() {
               alertType === "success" ? "bg-green-500" :
               "bg-red-500"
             }`}
-            style={{ width: `${Math.min(100, percentageCCNL)}%` }}
+            style={{ width: `${percentageCCNL}%` }}
           ></div>
         </div>
       </div>
@@ -231,14 +233,14 @@ export default function Dashboard() {
           value={totalCirculars.toString()}
           subtitle="Totale documenti"
           color="bg-blue-500"
-          icon=""
+          icon="📄"
         />
         <Card
           title="Eventi Totali"
           value={totalEvents.toString()}
           subtitle="Tutti gli eventi"
           color="bg-green-500"
-          icon="📅"
+          icon=""
         />
         <Card
           title="Ore Consigli di Classe"
@@ -282,7 +284,7 @@ export default function Dashboard() {
             count={cdcEvents.length}
             hours={formatHours(cdcMinutes)}
             color="bg-purple-500"
-            icon=""
+            icon="👥"
           />
           <EventTypeCard
             type="GLO"
@@ -334,9 +336,9 @@ export default function Dashboard() {
                   <div className="flex items-center gap-4">
                     <div className="text-2xl">
                       {event.type.toLowerCase().includes("consiglio") ? "👥" : 
-                       event.type.toLowerCase().includes("collegio") ? "️" : 
+                       event.type.toLowerCase().includes("collegio") ? "🏛️" : 
                        event.type.toLowerCase().includes("glo") ? "🤝" : 
-                       event.type.toLowerCase().includes("dipartiment") ? "📚" : 
+                       event.type.toLowerCase().includes("dipartiment") ? "" : 
                        event.type.toLowerCase().includes("colloquio") || event.type.toLowerCase().includes("famiglia") ? "💬" : "📌"}
                     </div>
                     <div>
@@ -357,7 +359,7 @@ export default function Dashboard() {
         {/* Ultima Circolare */}
         <div className="rounded-2xl bg-slate-900 p-6">
           <h2 className="mb-4 text-2xl font-semibold flex items-center gap-2">
-            <span></span> Ultima Circolare
+            <span>📄</span> Ultima Circolare
           </h2>
 
           {lastCircular ? (
