@@ -34,7 +34,6 @@ export default function Dashboard() {
         
         setCirculars(data);
         
-        // Estrai tutti gli eventi da tutte le circolari
         const allEvents: Event[] = [];
         data.forEach((circular: Circular) => {
           if (circular.events) {
@@ -55,20 +54,42 @@ export default function Dashboard() {
     fetchData();
   }, []);
 
-  // Calcola statistiche
+  // ✅ FUNZIONE PER CALCOLARE LE ORE REALI (come nella chat)
+  const calculateHours = (eventList: Event[]) => {
+    let totalMinutes = 0;
+    eventList.forEach(e => {
+      if (e.startTime && e.endTime) {
+        const [startH, startM] = e.startTime.split(':').map(Number);
+        const [endH, endM] = e.endTime.split(':').map(Number);
+        if (!isNaN(startH) && !isNaN(startM) && !isNaN(endH) && !isNaN(endM)) {
+          const duration = (endH * 60 + endM) - (startH * 60 + startM);
+          if (duration > 0) {
+            totalMinutes += duration;
+          }
+        }
+      }
+    });
+    const hours = Math.floor(totalMinutes / 60);
+    const minutes = totalMinutes % 60;
+    return minutes > 0 ? `${hours}h ${minutes}m` : `${hours}h`;
+  };
+
+  // ✅ FILTRI FLESSIBILI (come nel backend della chat)
+  const cdcEvents = events.filter(e => e.type.toLowerCase().includes("consiglio") || e.title.toLowerCase().includes("consiglio"));
+  const cdcHoursStr = calculateHours(cdcEvents);
+  
+  const collegiEvents = events.filter(e => e.type.toLowerCase().includes("collegio") || e.title.toLowerCase().includes("collegio"));
+  const collegiHoursStr = calculateHours(collegiEvents);
+  
+  const dipartimentiEvents = events.filter(e => e.type.toLowerCase().includes("dipartiment") || e.title.toLowerCase().includes("dipartiment"));
+  const dipartimentiHoursStr = calculateHours(dipartimentiEvents);
+
+  const totalCollegiDipartimentiHours = calculateHours([...collegiEvents, ...dipartimentiEvents]);
+
+  // Statistiche generali
   const totalCirculars = circulars.length;
   const totalEvents = events.length;
   
-  // Conta ore per tipo di evento
-  const cdcEvents = events.filter(e => e.type === "Consigli di Classe");
-  const cdcHours = cdcEvents.length; // Ogni evento = 1 ora
-  
-  const collegiEvents = events.filter(e => e.type === "Collegio dei Docenti");
-  const collegiHours = collegiEvents.length;
-  
-  const dipartimentiEvents = events.filter(e => e.type === "Dipartimenti Disciplinari");
-  const dipartimentiHours = dipartimentiEvents.length;
-
   // Prossimi eventi (futuri)
   const today = new Date();
   const upcomingEvents = events
@@ -81,9 +102,8 @@ export default function Dashboard() {
       const dateB = new Date(b.date.split('/').reverse().join('-'));
       return dateA.getTime() - dateB.getTime();
     })
-    .slice(0, 5); // Mostra solo i prossimi 5
+    .slice(0, 5);
 
-  // Ultima circolare
   const lastCircular = circulars.length > 0 ? circulars[0] : null;
 
   if (loading) {
@@ -116,27 +136,24 @@ export default function Dashboard() {
           color="bg-blue-500"
           icon="📄"
         />
-
         <Card
           title="Eventi Totali"
           value={totalEvents.toString()}
-          subtitle="Consigli, Collegi, GLO"
+          subtitle="Consigli, Collegi, GLO, ecc."
           color="bg-green-500"
           icon="📅"
         />
-
         <Card
           title="Ore Consigli di Classe"
-          value={cdcHours.toString()}
-          subtitle="Ore totali CDC"
+          value={cdcHoursStr}
+          subtitle="Calcolo preciso"
           color="bg-purple-500"
           icon="👥"
         />
-
         <Card
           title="Ore Collegi & Dipartimenti"
-          value={(collegiHours + dipartimentiHours).toString()}
-          subtitle="Collegi + Dipartimenti"
+          value={totalCollegiDipartimentiHours}
+          subtitle="Somma precisa"
           color="bg-orange-500"
           icon="🏛️"
         />
@@ -160,9 +177,9 @@ export default function Dashboard() {
                 <div key={event.id} className="flex items-center justify-between p-4 bg-slate-800 rounded-lg border border-slate-700">
                   <div className="flex items-center gap-4">
                     <div className="text-2xl">
-                      {event.type === "Consigli di Classe" ? "👥" : 
-                       event.type === "Collegio dei Docenti" ? "️" : 
-                       event.type === "GLO" ? "🤝" : ""}
+                      {event.type.toLowerCase().includes("consiglio") ? "👥" : 
+                       event.type.toLowerCase().includes("collegio") ? "🏛️" : 
+                       event.type.toLowerCase().includes("glo") ? "🤝" : "📌"}
                     </div>
                     <div>
                       <h3 className="font-semibold text-white">{event.title}</h3>
@@ -223,21 +240,21 @@ export default function Dashboard() {
           <EventTypeCard
             type="Consigli di Classe"
             count={cdcEvents.length}
-            hours={cdcHours}
+            hours={cdcHoursStr}
             color="bg-purple-500"
             icon="👥"
           />
           <EventTypeCard
             type="Collegio dei Docenti"
             count={collegiEvents.length}
-            hours={collegiHours}
+            hours={collegiHoursStr}
             color="bg-orange-500"
             icon="🏛️"
           />
           <EventTypeCard
-            type="Dipartimenti Disciplinari"
+            type="Dipartimenti"
             count={dipartimentiEvents.length}
-            hours={dipartimentiHours}
+            hours={dipartimentiHoursStr}
             color="bg-green-500"
             icon="📚"
           />
@@ -275,7 +292,7 @@ function Card({ title, value, subtitle, color, icon }: CardProps) {
 type EventTypeCardProps = {
   type: string;
   count: number;
-  hours: number;
+  hours: string; // Cambiato da number a string per supportare "3h 0m"
   color: string;
   icon: string;
 };
