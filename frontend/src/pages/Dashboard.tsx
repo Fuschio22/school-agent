@@ -75,13 +75,22 @@ export default function Dashboard() {
   };
 
   // ✅ FILTRI FLESSIBILI PER OGNI CATEGORIA
-  const cdcEvents = events.filter(e => e.type.toLowerCase().includes("consiglio") || e.title.toLowerCase().includes("consiglio"));
+  const cdcEvents = events.filter(e => 
+    e.type.toLowerCase().includes("consiglio") || 
+    e.title.toLowerCase().includes("consiglio")
+  );
   const cdcHoursStr = calculateHours(cdcEvents);
   
-  const collegiEvents = events.filter(e => e.type.toLowerCase().includes("collegio") || e.title.toLowerCase().includes("collegio"));
+  const collegiEvents = events.filter(e => 
+    e.type.toLowerCase().includes("collegio") || 
+    e.title.toLowerCase().includes("collegio")
+  );
   const collegiHoursStr = calculateHours(collegiEvents);
   
-  const dipartimentiEvents = events.filter(e => e.type.toLowerCase().includes("dipartiment") || e.title.toLowerCase().includes("dipartiment"));
+  const dipartimentiEvents = events.filter(e => 
+    e.type.toLowerCase().includes("dipartiment") || 
+    e.title.toLowerCase().includes("dipartiment")
+  );
   const dipartimentiHoursStr = calculateHours(dipartimentiEvents);
   
   const gloEvents = events.filter(e => 
@@ -92,11 +101,14 @@ export default function Dashboard() {
   );
   const gloHoursStr = calculateHours(gloEvents);
   
+  // ✅ FILTRO CORRETTO PER COLLOQUI (include "Scuola-Famiglia")
   const colloquiEvents = events.filter(e => 
     e.type.toLowerCase().includes("colloquio") || 
     e.title.toLowerCase().includes("colloquio") ||
     e.type.toLowerCase().includes("riceviment") ||
-    e.title.toLowerCase().includes("riceviment")
+    e.title.toLowerCase().includes("riceviment") ||
+    e.type.toLowerCase().includes("famiglia") ||
+    e.title.toLowerCase().includes("famiglia")
   );
   const colloquiHoursStr = calculateHours(colloquiEvents);
 
@@ -162,14 +174,14 @@ export default function Dashboard() {
           value={cdcHoursStr}
           subtitle="Calcolo preciso"
           color="bg-purple-500"
-          icon=""
+          icon="👥"
         />
         <Card
           title="Ore GLO"
           value={gloHoursStr}
           subtitle="Gruppi di Lavoro"
           color="bg-cyan-500"
-          icon="🤝"
+          icon=""
         />
         <Card
           title="Ore Collegi Docenti"
@@ -227,7 +239,7 @@ export default function Dashboard() {
             count={colloquiEvents.length}
             hours={colloquiHoursStr}
             color="bg-pink-500"
-            icon=""
+            icon="💬"
           />
         </div>
       </div>
@@ -250,10 +262,11 @@ export default function Dashboard() {
                 <div key={event.id} className="flex items-center justify-between p-4 bg-slate-800 rounded-lg border border-slate-700">
                   <div className="flex items-center gap-4">
                     <div className="text-2xl">
-                      {event.type.toLowerCase().includes("consiglio") ? "👥" : 
+                      {event.type.toLowerCase().includes("consiglio") ? "" : 
                        event.type.toLowerCase().includes("collegio") ? "🏛️" : 
                        event.type.toLowerCase().includes("glo") ? "🤝" : 
-                       event.type.toLowerCase().includes("dipartiment") ? "📚" : ""}
+                       event.type.toLowerCase().includes("dipartiment") ? "📚" : 
+                       event.type.toLowerCase().includes("colloquio") || event.type.toLowerCase().includes("famiglia") ? "💬" : "📌"}
                     </div>
                     <div>
                       <h3 className="font-semibold text-white">{event.title}</h3>
@@ -292,7 +305,7 @@ export default function Dashboard() {
               </div>
               <div className="p-4 bg-blue-600/20 rounded-lg border border-blue-600/30">
                 <p className="text-sm text-blue-300">
-                   {lastCircular.events?.length || 0} eventi estratti
+                  📊 {lastCircular.events?.length || 0} eventi estratti
                 </p>
               </div>
             </div>
