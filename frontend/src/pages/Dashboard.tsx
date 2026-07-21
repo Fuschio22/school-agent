@@ -54,7 +54,7 @@ export default function Dashboard() {
     fetchData();
   }, []);
 
-  // ✅ FUNZIONE PER CALCOLARE LE ORE REALI (come nella chat)
+  // ✅ FUNZIONE PER CALCOLARE LE ORE REALI
   const calculateHours = (eventList: Event[]) => {
     let totalMinutes = 0;
     eventList.forEach(e => {
@@ -74,7 +74,7 @@ export default function Dashboard() {
     return minutes > 0 ? `${hours}h ${minutes}m` : `${hours}h`;
   };
 
-  // ✅ FILTRI FLESSIBILI (come nel backend della chat)
+  // ✅ FILTRI FLESSIBILI PER OGNI CATEGORIA
   const cdcEvents = events.filter(e => e.type.toLowerCase().includes("consiglio") || e.title.toLowerCase().includes("consiglio"));
   const cdcHoursStr = calculateHours(cdcEvents);
   
@@ -83,8 +83,22 @@ export default function Dashboard() {
   
   const dipartimentiEvents = events.filter(e => e.type.toLowerCase().includes("dipartiment") || e.title.toLowerCase().includes("dipartiment"));
   const dipartimentiHoursStr = calculateHours(dipartimentiEvents);
-
-  const totalCollegiDipartimentiHours = calculateHours([...collegiEvents, ...dipartimentiEvents]);
+  
+  const gloEvents = events.filter(e => 
+    e.type.toLowerCase().includes("glo") || 
+    e.title.toLowerCase().includes("glo") ||
+    e.type.toLowerCase().includes("gruppo di lavoro") ||
+    e.title.toLowerCase().includes("gruppo di lavoro")
+  );
+  const gloHoursStr = calculateHours(gloEvents);
+  
+  const colloquiEvents = events.filter(e => 
+    e.type.toLowerCase().includes("colloquio") || 
+    e.title.toLowerCase().includes("colloquio") ||
+    e.type.toLowerCase().includes("riceviment") ||
+    e.title.toLowerCase().includes("riceviment")
+  );
+  const colloquiHoursStr = calculateHours(colloquiEvents);
 
   // Statistiche generali
   const totalCirculars = circulars.length;
@@ -127,8 +141,8 @@ export default function Dashboard() {
         </p>
       </div>
 
-      {/* Card Statistiche */}
-      <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-4">
+      {/* Card Statistiche Principali */}
+      <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
         <Card
           title="Circolari Caricate"
           value={totalCirculars.toString()}
@@ -139,7 +153,7 @@ export default function Dashboard() {
         <Card
           title="Eventi Totali"
           value={totalEvents.toString()}
-          subtitle="Consigli, Collegi, GLO, ecc."
+          subtitle="Tutti gli eventi"
           color="bg-green-500"
           icon="📅"
         />
@@ -148,15 +162,74 @@ export default function Dashboard() {
           value={cdcHoursStr}
           subtitle="Calcolo preciso"
           color="bg-purple-500"
-          icon="👥"
+          icon=""
         />
         <Card
-          title="Ore Collegi & Dipartimenti"
-          value={totalCollegiDipartimentiHours}
-          subtitle="Somma precisa"
+          title="Ore GLO"
+          value={gloHoursStr}
+          subtitle="Gruppi di Lavoro"
+          color="bg-cyan-500"
+          icon="🤝"
+        />
+        <Card
+          title="Ore Collegi Docenti"
+          value={collegiHoursStr}
+          subtitle="Calcolo preciso"
           color="bg-orange-500"
           icon="🏛️"
         />
+        <Card
+          title="Ore Dipartimenti"
+          value={dipartimentiHoursStr}
+          subtitle="Calcolo preciso"
+          color="bg-emerald-500"
+          icon="📚"
+        />
+      </div>
+
+      {/* Riepilogo Completo per Tipo */}
+      <div className="rounded-2xl bg-slate-900 p-6">
+        <h2 className="mb-4 text-2xl font-semibold flex items-center gap-2">
+          <span>📊</span> Riepilogo Dettagliato per Tipo di Evento
+        </h2>
+
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          <EventTypeCard
+            type="Consigli di Classe"
+            count={cdcEvents.length}
+            hours={cdcHoursStr}
+            color="bg-purple-500"
+            icon="👥"
+          />
+          <EventTypeCard
+            type="GLO"
+            count={gloEvents.length}
+            hours={gloHoursStr}
+            color="bg-cyan-500"
+            icon="🤝"
+          />
+          <EventTypeCard
+            type="Collegio dei Docenti"
+            count={collegiEvents.length}
+            hours={collegiHoursStr}
+            color="bg-orange-500"
+            icon="🏛️"
+          />
+          <EventTypeCard
+            type="Dipartimenti"
+            count={dipartimentiEvents.length}
+            hours={dipartimentiHoursStr}
+            color="bg-emerald-500"
+            icon="📚"
+          />
+          <EventTypeCard
+            type="Colloqui/Ricevimenti"
+            count={colloquiEvents.length}
+            hours={colloquiHoursStr}
+            color="bg-pink-500"
+            icon=""
+          />
+        </div>
       </div>
 
       {/* Prossimi Eventi e Ultima Circolare */}
@@ -179,7 +252,8 @@ export default function Dashboard() {
                     <div className="text-2xl">
                       {event.type.toLowerCase().includes("consiglio") ? "👥" : 
                        event.type.toLowerCase().includes("collegio") ? "🏛️" : 
-                       event.type.toLowerCase().includes("glo") ? "🤝" : "📌"}
+                       event.type.toLowerCase().includes("glo") ? "🤝" : 
+                       event.type.toLowerCase().includes("dipartiment") ? "📚" : ""}
                     </div>
                     <div>
                       <h3 className="font-semibold text-white">{event.title}</h3>
@@ -218,7 +292,7 @@ export default function Dashboard() {
               </div>
               <div className="p-4 bg-blue-600/20 rounded-lg border border-blue-600/30">
                 <p className="text-sm text-blue-300">
-                  📊 {lastCircular.events?.length || 0} eventi estratti
+                   {lastCircular.events?.length || 0} eventi estratti
                 </p>
               </div>
             </div>
@@ -227,37 +301,6 @@ export default function Dashboard() {
               Nessuna circolare caricata
             </div>
           )}
-        </div>
-      </div>
-
-      {/* Riepilogo per Tipo */}
-      <div className="rounded-2xl bg-slate-900 p-6">
-        <h2 className="mb-4 text-2xl font-semibold flex items-center gap-2">
-          <span>📊</span> Riepilogo per Tipo di Evento
-        </h2>
-
-        <div className="grid gap-4 md:grid-cols-3">
-          <EventTypeCard
-            type="Consigli di Classe"
-            count={cdcEvents.length}
-            hours={cdcHoursStr}
-            color="bg-purple-500"
-            icon="👥"
-          />
-          <EventTypeCard
-            type="Collegio dei Docenti"
-            count={collegiEvents.length}
-            hours={collegiHoursStr}
-            color="bg-orange-500"
-            icon="🏛️"
-          />
-          <EventTypeCard
-            type="Dipartimenti"
-            count={dipartimentiEvents.length}
-            hours={dipartimentiHoursStr}
-            color="bg-green-500"
-            icon="📚"
-          />
         </div>
       </div>
     </div>
@@ -292,7 +335,7 @@ function Card({ title, value, subtitle, color, icon }: CardProps) {
 type EventTypeCardProps = {
   type: string;
   count: number;
-  hours: string; // Cambiato da number a string per supportare "3h 0m"
+  hours: string;
   color: string;
   icon: string;
 };
