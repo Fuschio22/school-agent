@@ -44,14 +44,13 @@ const calculateDurationHours = (startTime: string, endTime: string): number => {
   const startMinutes = startHour * 60 + startMin;
   const endMinutes = endHour * 60 + endMin;
   
-  // Se l'orario di fine è prima dell'inizio, c'è un errore nei dati
   if (endMinutes <= startMinutes) {
     console.warn(`⚠️ Orario non valido: ${startTime} - ${endTime}. Impostato a 0.`);
     return 0;
   }
   
   const durationMinutes = endMinutes - startMinutes;
-  return durationMinutes / 60; // Converte in ore
+  return durationMinutes / 60;
 };
 
 export default function Hours() {
@@ -89,7 +88,6 @@ export default function Hours() {
   const groupEventsByMonth = (): MonthlyStats[] => {
     const monthsMap: { [key: string]: MonthlyStats } = {};
     
-    // Mesi dell'anno scolastico: Settembre 2025 - Luglio 2026
     const schoolYearMonths = [
       { month: "Settembre", year: "2025", monthNumber: 9 },
       { month: "Ottobre", year: "2025", monthNumber: 10 },
@@ -104,7 +102,6 @@ export default function Hours() {
       { month: "Luglio", year: "2026", monthNumber: 7 }
     ];
 
-    // Inizializza tutti i mesi dell'anno scolastico
     schoolYearMonths.forEach(({ month, year, monthNumber }) => {
       const monthKey = `${year}-${String(monthNumber).padStart(2, '0')}`;
       monthsMap[monthKey] = {
@@ -123,12 +120,11 @@ export default function Hours() {
       };
     });
 
-    // Filtra solo eventi dell'anno scolastico 2025/2026
     const schoolYearEvents = events.filter(event => {
       const [, month, year] = event.date.split('/');
       const eventDate = new Date(parseInt(year), parseInt(month) - 1);
-      const startDate = new Date(2025, 8, 1); // 1 Settembre 2025
-      const endDate = new Date(2026, 6, 31); // 31 Luglio 2026
+      const startDate = new Date(2025, 8, 1);
+      const endDate = new Date(2026, 6, 31);
       return eventDate >= startDate && eventDate <= endDate;
     });
 
@@ -138,8 +134,6 @@ export default function Hours() {
       
       if (monthsMap[monthKey]) {
         monthsMap[monthKey].events.push(event);
-        
-        // Calcola la durata reale dell'evento
         const duration = calculateDurationHours(event.startTime, event.endTime);
         monthsMap[monthKey].totalHours += duration;
 
@@ -148,12 +142,11 @@ export default function Hours() {
         else if (event.type === "Collegio dei Docenti") monthsMap[monthKey].collegiHours += duration;
         else if (event.type === "Dipartimenti Disciplinari") monthsMap[monthKey].dipartimentiHours += duration;
         else if (event.type === "GLI") monthsMap[monthKey].gliHours += duration;
-        else if (event.type === "Colloqui Scuola-Famiglia") monthsMap[monthKey].colloquiHours += duration;
+        else if (event.type === "Colloqui Scuola-Famiglia" || event.type.toLowerCase().includes("colloquio")) monthsMap[monthKey].colloquiHours += duration;
         else if (event.type === "Scrutini" || event.type.includes("Scrutinio")) monthsMap[monthKey].scrutiniHours += duration;
       }
     });
 
-    // Converti in array e ordina per data
     return Object.values(monthsMap).sort((a, b) => {
       const dateA = new Date(parseInt(a.year), a.monthNumber - 1);
       const dateB = new Date(parseInt(b.year), b.monthNumber - 1);
@@ -162,8 +155,6 @@ export default function Hours() {
   };
 
   const monthlyStats = groupEventsByMonth();
-  
-  // Calcola il totale ore
   const totalHours = monthlyStats.reduce((sum, month) => sum + month.totalHours, 0);
 
   if (loading) {
@@ -175,7 +166,6 @@ export default function Hours() {
     );
   }
 
-  // Funzione per formattare le ore (es. 2.25 → 2h 15min)
   const formatHours = (hours: number): string => {
     if (hours === 0) return "0min";
     const h = Math.floor(hours);
@@ -184,10 +174,8 @@ export default function Hours() {
     return `${h}h ${m}min`;
   };
 
-  // Funzione per ordinare gli eventi per data e ora
   const sortEventsByDateAndTime = (events: Event[]): Event[] => {
     return events.sort((a, b) => {
-      // Prima ordina per data
       const dateA = new Date(a.date.split('/').reverse().join('-'));
       const dateB = new Date(b.date.split('/').reverse().join('-'));
       
@@ -195,7 +183,6 @@ export default function Hours() {
         return dateA.getTime() - dateB.getTime();
       }
       
-      // Se la data è uguale, ordina per orario di inizio
       const timeA = a.startTime.replace(':', '');
       const timeB = b.startTime.replace(':', '');
       return timeA.localeCompare(timeB);
@@ -219,7 +206,7 @@ export default function Hours() {
         <p className="text-slate-400 mt-2">dal 1 Settembre 2025 al 31 Luglio 2026</p>
       </div>
 
-      {/* Riepilogo Mensile - Anno Scolastico Completo */}
+      {/* Riepilogo Mensile */}
       <div className="rounded-2xl bg-slate-900 p-6 border border-slate-800">
         <h2 className="text-2xl font-semibold mb-4">📊 Riepilogo Mensile</h2>
         <div className="space-y-2">
@@ -232,7 +219,6 @@ export default function Hours() {
 
             return (
               <div key={monthKey} className="border border-slate-800 rounded-lg overflow-hidden">
-                {/* Header del mese - sempre visibile */}
                 <div 
                   className={`p-4 hover:bg-slate-800 transition-colors ${hasEvents ? 'cursor-pointer' : 'cursor-default'}`}
                   onClick={() => hasEvents && setExpandedMonth(isExpanded ? null : monthKey)}
@@ -265,7 +251,6 @@ export default function Hours() {
                     )}
                   </div>
                   
-                  {/* Riepilogo compatto per mobile */}
                   {hasEvents && (
                     <div className="mt-2 text-xs text-slate-400 lg:hidden">
                       CDC+GLO: <span className="text-blue-400">{formatHours(cdcGloHours)}</span> | 
@@ -274,10 +259,8 @@ export default function Hours() {
                   )}
                 </div>
 
-                {/* Dettagli espandibili */}
                 {isExpanded && hasEvents && (
                   <div className="p-4 bg-slate-950/30 border-t border-slate-800">
-                    {/* Card per tipo di evento */}
                     <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-4 mb-4">
                       {monthStat.cdcHours > 0 && (
                         <div className="p-3 bg-blue-900/20 rounded-lg border border-blue-600/30">
@@ -323,7 +306,7 @@ export default function Hours() {
                       )}
                     </div>
 
-                    {/* Tabella eventi del mese - ORDINATA per data e ora */}
+                    {/* ✅ TABELLA EVENTI CON NUOVA COLONNA "CIRCOLARE" */}
                     <div className="overflow-x-auto">
                       <table className="w-full text-sm">
                         <thead>
@@ -334,43 +317,52 @@ export default function Hours() {
                             <th className="text-left p-2 text-slate-400">Orario</th>
                             <th className="text-left p-2 text-slate-400">Durata</th>
                             <th className="text-left p-2 text-slate-400">Sede</th>
+                            <th className="text-left p-2 text-slate-400">Circolare</th>
                           </tr>
                         </thead>
                         <tbody>
-                          {sortEventsByDateAndTime(monthStat.events)
-                            .map((event) => {
-                              const duration = calculateDurationHours(event.startTime, event.endTime);
-                              const hasInvalidTime = duration === 0 && event.startTime > event.endTime;
-                              
-                              return (
-                                <tr key={event.id} className="border-b border-slate-800/50 hover:bg-slate-800/30">
-                                  <td className="p-2 text-slate-300">{event.date}</td>
-                                  <td className="p-2">
-                                    <span className="px-2 py-1 bg-slate-800 rounded text-xs font-semibold text-slate-300">
-                                      {event.type}
+                          {sortEventsByDateAndTime(monthStat.events).map((event) => {
+                            const duration = calculateDurationHours(event.startTime, event.endTime);
+                            const hasInvalidTime = duration === 0 && event.startTime > event.endTime;
+                            
+                            return (
+                              <tr key={event.id} className="border-b border-slate-800/50 hover:bg-slate-800/30">
+                                <td className="p-2 text-slate-300 whitespace-nowrap">{event.date}</td>
+                                <td className="p-2">
+                                  <span className="px-2 py-1 bg-slate-800 rounded text-xs font-semibold text-slate-300 whitespace-nowrap">
+                                    {event.type}
+                                  </span>
+                                </td>
+                                <td className="p-2 text-slate-300 max-w-xs truncate" title={event.title}>{event.title}</td>
+                                <td className="p-2 text-slate-300 whitespace-nowrap">
+                                  {hasInvalidTime ? (
+                                    <span className="text-red-400 font-semibold">
+                                      {event.startTime} - {event.endTime} ⚠️
                                     </span>
-                                  </td>
-                                  <td className="p-2 text-slate-300">{event.title}</td>
-                                  <td className="p-2 text-slate-300">
-                                    {hasInvalidTime ? (
-                                      <span className="text-red-400 font-semibold">
-                                        {event.startTime} - {event.endTime} ⚠️
-                                      </span>
-                                    ) : (
-                                      event.startTime + ' - ' + event.endTime
-                                    )}
-                                  </td>
-                                  <td className="p-2 font-semibold">
-                                    {hasInvalidTime ? (
-                                      <span className="text-red-400">Errore</span>
-                                    ) : (
-                                      <span className="text-blue-400">{formatHours(duration)}</span>
-                                    )}
-                                  </td>
-                                  <td className="p-2 text-slate-400 text-xs">{event.location}</td>
-                                </tr>
-                              );
-                            })}
+                                  ) : (
+                                    event.startTime + ' - ' + event.endTime
+                                  )}
+                                </td>
+                                <td className="p-2 font-semibold whitespace-nowrap">
+                                  {hasInvalidTime ? (
+                                    <span className="text-red-400">Errore</span>
+                                  ) : (
+                                    <span className="text-blue-400">{formatHours(duration)}</span>
+                                  )}
+                                </td>
+                                <td className="p-2 text-slate-400 text-xs max-w-[150px] truncate" title={event.location}>{event.location}</td>
+                                <td className="p-2 whitespace-nowrap">
+                                  {event.circularNumber ? (
+                                    <span className="inline-flex items-center px-2 py-1 bg-blue-900/30 text-blue-300 rounded text-xs font-semibold border border-blue-700/50">
+                                      📄 n. {event.circularNumber}
+                                    </span>
+                                  ) : (
+                                    <span className="text-slate-500 text-xs">-</span>
+                                  )}
+                                </td>
+                              </tr>
+                            );
+                          })}
                         </tbody>
                       </table>
                     </div>
