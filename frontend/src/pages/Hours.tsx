@@ -84,22 +84,22 @@ export default function Hours() {
     fetchData();
   }, []);
 
-  // Raggruppa eventi per mese (solo anno scolastico 2025/2026)
+  // Raggruppa eventi per mese - ✅ AGGIORNATO A.S. 2026/2027
   const groupEventsByMonth = (): MonthlyStats[] => {
     const monthsMap: { [key: string]: MonthlyStats } = {};
     
     const schoolYearMonths = [
-      { month: "Settembre", year: "2025", monthNumber: 9 },
-      { month: "Ottobre", year: "2025", monthNumber: 10 },
-      { month: "Novembre", year: "2025", monthNumber: 11 },
-      { month: "Dicembre", year: "2025", monthNumber: 12 },
-      { month: "Gennaio", year: "2026", monthNumber: 1 },
-      { month: "Febbraio", year: "2026", monthNumber: 2 },
-      { month: "Marzo", year: "2026", monthNumber: 3 },
-      { month: "Aprile", year: "2026", monthNumber: 4 },
-      { month: "Maggio", year: "2026", monthNumber: 5 },
-      { month: "Giugno", year: "2026", monthNumber: 6 },
-      { month: "Luglio", year: "2026", monthNumber: 7 }
+      { month: "Settembre", year: "2026", monthNumber: 9 },
+      { month: "Ottobre", year: "2026", monthNumber: 10 },
+      { month: "Novembre", year: "2026", monthNumber: 11 },
+      { month: "Dicembre", year: "2026", monthNumber: 12 },
+      { month: "Gennaio", year: "2027", monthNumber: 1 },
+      { month: "Febbraio", year: "2027", monthNumber: 2 },
+      { month: "Marzo", year: "2027", monthNumber: 3 },
+      { month: "Aprile", year: "2027", monthNumber: 4 },
+      { month: "Maggio", year: "2027", monthNumber: 5 },
+      { month: "Giugno", year: "2027", monthNumber: 6 },
+      { month: "Luglio", year: "2027", monthNumber: 7 }
     ];
 
     schoolYearMonths.forEach(({ month, year, monthNumber }) => {
@@ -120,11 +120,12 @@ export default function Hours() {
       };
     });
 
+    // ✅ Filtra solo eventi dell'anno scolastico 2026/2027
     const schoolYearEvents = events.filter(event => {
       const [, month, year] = event.date.split('/');
       const eventDate = new Date(parseInt(year), parseInt(month) - 1);
-      const startDate = new Date(2025, 8, 1);
-      const endDate = new Date(2026, 6, 31);
+      const startDate = new Date(2026, 8, 1); // 1 Settembre 2026
+      const endDate = new Date(2027, 6, 31); // 31 Luglio 2027
       return eventDate >= startDate && eventDate <= endDate;
     });
 
@@ -195,7 +196,7 @@ export default function Hours() {
       <div>
         <h1 className="text-4xl font-bold">Registro Ore</h1>
         <p className="mt-2 text-slate-400">
-          Anno Scolastico 2025/2026 - Conteggio automatico delle attività
+          Anno Scolastico 2026/2027 - Conteggio automatico delle attività
         </p>
       </div>
 
@@ -203,7 +204,7 @@ export default function Hours() {
       <div className="rounded-2xl bg-slate-900 p-6 border border-slate-800">
         <h2 className="text-2xl font-semibold mb-4">Totale Ore Anno Scolastico</h2>
         <div className="text-6xl font-bold text-blue-400">{formatHours(totalHours)}</div>
-        <p className="text-slate-400 mt-2">dal 1 Settembre 2025 al 31 Luglio 2026</p>
+        <p className="text-slate-400 mt-2">dal 1 Settembre 2026 al 31 Luglio 2027</p>
       </div>
 
       {/* Riepilogo Mensile */}
@@ -306,7 +307,7 @@ export default function Hours() {
                       )}
                     </div>
 
-                    {/* ✅ TABELLA EVENTI CON NUOVA COLONNA "CIRCOLARE" */}
+                    {/* TABELLA EVENTI CON COLONNA CIRCOLARE */}
                     <div className="overflow-x-auto">
                       <table className="w-full text-sm">
                         <thead>
