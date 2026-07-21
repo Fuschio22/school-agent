@@ -54,7 +54,7 @@ export default function Dashboard() {
     fetchData();
   }, []);
 
-  // ✅ FUNZIONE PER CALCOLARE I MINUTI TOTALI (per uso interno)
+  // ✅ FUNZIONE PER CALCOLARE I MINUTI TOTALI
   const calculateMinutes = (eventList: Event[]) => {
     let totalMinutes = 0;
     eventList.forEach(e => {
@@ -72,7 +72,7 @@ export default function Dashboard() {
     return totalMinutes;
   };
 
-  // ✅ FUNZIONE PER FORMATTAZIONE ORE (per display)
+  // ✅ FUNZIONE PER FORMATTAZIONE ORE
   const formatHours = (totalMinutes: number) => {
     const hours = Math.floor(totalMinutes / 60);
     const minutes = totalMinutes % 60;
@@ -107,21 +107,37 @@ export default function Dashboard() {
   );
   const colloquiMinutes = calculateMinutes(colloquiEvents);
 
-  // ✅ CALCOLO SOGLIA CCNL
-  // 40 ore totali / 18 classi totali * 12 tue classi = 26.666 ore = 1600 minuti
-  const TARGET_CCNL_MINUTES = Math.round((40 / 18) * 12 * 60); // 1600 minuti
+  // ✅ CALCOLO SOGLIA CCNL E AVVISI
+  const TARGET_CCNL_MINUTES = Math.round((40 / 18) * 12 * 60); // 1600 minuti = 26h 40m
   const currentCCNLMinutes = cdcMinutes + gloMinutes;
+  const remainingMinutes = TARGET_CCNL_MINUTES - currentCCNLMinutes;
   const percentageCCNL = Math.min(100, Math.round((currentCCNLMinutes / TARGET_CCNL_MINUTES) * 100));
   
-  // Determina il colore della barra in base alla percentuale
-  let progressColor = "bg-blue-500";
-  let statusText = "In corso";
-  if (percentageCCNL >= 100) {
-    progressColor = "bg-green-500";
-    statusText = "Obiettivo raggiunto! 🎉";
-  } else if (percentageCCNL >= 80) {
-    progressColor = "bg-yellow-500";
-    statusText = "Quasi completato";
+  // ✅ SISTEMA DI AVVISI DINAMICI
+  let alertType = "info"; // info, warning, success, danger
+  let alertMessage = "";
+  let alertIcon = "";
+  
+  if (remainingMinutes > 120) {
+    // Più di 2 ore dalla soglia
+    alertType = "info";
+    alertMessage = `Mancano ${formatHours(remainingMinutes)} per raggiungere l'obbligo CCNL`;
+    alertIcon = "ℹ️";
+  } else if (remainingMinutes > 0 && remainingMinutes <= 120) {
+    // Meno di 2 ore dalla soglia
+    alertType = "warning";
+    alertMessage = `⚠️ ATTENZIONE: Mancano solo ${formatHours(remainingMinutes)} per completare l'obbligo CCNL!`;
+    alertIcon = "⚠️";
+  } else if (remainingMinutes === 0) {
+    // Esattamente alla soglia
+    alertType = "success";
+    alertMessage = "✅ Hai appena raggiunto l'obbligo CCNL!";
+    alertIcon = "✅";
+  } else {
+    // Ha superato la soglia
+    alertType = "danger";
+    alertMessage = `🚨 HAI SUPERATO l'obbligo CCNL di ${formatHours(Math.abs(remainingMinutes))}!`;
+    alertIcon = "🚨";
   }
 
   // Statistiche generali
@@ -165,36 +181,46 @@ export default function Dashboard() {
         </p>
       </div>
 
-      {/* ✅ NUOVA CARD: STATO CCNL */}
-      <div className="rounded-2xl bg-slate-900 p-6 border border-slate-800">
-        <div className="flex flex-col md:flex-row md:items-center justify-between mb-4">
-          <div>
-            <h2 className="text-xl font-bold text-white flex items-center gap-2">
-              <span>⚖️</span> Stato Obblighi CCNL (CDC + GLO)
-            </h2>
-            <p className="text-sm text-slate-400 mt-1">
-              Soglia calcolata: 40h ÷ 18 classi × 12 tue classi = <span className="text-white font-semibold">26h 40m</span>
+      {/* ✅ BANNER DI AVVISO CCNL */}
+      <div className={`rounded-2xl p-6 border-2 ${
+        alertType === "info" ? "bg-blue-900/20 border-blue-500" :
+        alertType === "warning" ? "bg-yellow-900/20 border-yellow-500" :
+        alertType === "success" ? "bg-green-900/20 border-green-500" :
+        "bg-red-900/20 border-red-500"
+      }`}>
+        <div className="flex items-start gap-4">
+          <div className="text-4xl">{alertIcon}</div>
+          <div className="flex-1">
+            <h2 className="text-xl font-bold text-white mb-2">Stato Obblighi CCNL (CDC + GLO)</h2>
+            <p className={`text-lg font-semibold ${
+              alertType === "info" ? "text-blue-400" :
+              alertType === "warning" ? "text-yellow-400" :
+              alertType === "success" ? "text-green-400" :
+              "text-red-400"
+            }`}>
+              {alertMessage}
             </p>
-          </div>
-          <div className="mt-2 md:mt-0 text-right">
-            <p className="text-3xl font-bold text-white">{formatHours(currentCCNLMinutes)}</p>
-            <p className="text-xs text-slate-400">su {formatHours(TARGET_CCNL_MINUTES)} richieste</p>
+            <div className="mt-3 flex items-center gap-4 text-sm text-slate-400">
+              <span>Attuali: <span className="text-white font-bold">{formatHours(currentCCNLMinutes)}</span></span>
+              <span>•</span>
+              <span>Obbligo: <span className="text-white font-bold">{formatHours(TARGET_CCNL_MINUTES)}</span></span>
+              <span>•</span>
+              <span>Progresso: <span className="text-white font-bold">{percentageCCNL}%</span></span>
+            </div>
           </div>
         </div>
         
         {/* Barra di Progresso */}
-        <div className="w-full bg-slate-800 rounded-full h-4 mb-2 overflow-hidden">
+        <div className="mt-4 w-full bg-slate-800 rounded-full h-3 overflow-hidden">
           <div 
-            className={`h-4 rounded-full ${progressColor} transition-all duration-500 ease-out`}
-            style={{ width: `${percentageCCNL}%` }}
+            className={`h-3 rounded-full transition-all duration-500 ${
+              alertType === "info" ? "bg-blue-500" :
+              alertType === "warning" ? "bg-yellow-500" :
+              alertType === "success" ? "bg-green-500" :
+              "bg-red-500"
+            }`}
+            style={{ width: `${Math.min(100, percentageCCNL)}%` }}
           ></div>
-        </div>
-        
-        <div className="flex justify-between items-center text-sm">
-          <span className={`font-semibold ${percentageCCNL >= 100 ? 'text-green-400' : 'text-blue-400'}`}>
-            {percentageCCNL}% completato
-          </span>
-          <span className="text-slate-400">{statusText}</span>
         </div>
       </div>
 
@@ -205,7 +231,7 @@ export default function Dashboard() {
           value={totalCirculars.toString()}
           subtitle="Totale documenti"
           color="bg-blue-500"
-          icon="📄"
+          icon=""
         />
         <Card
           title="Eventi Totali"
@@ -256,14 +282,14 @@ export default function Dashboard() {
             count={cdcEvents.length}
             hours={formatHours(cdcMinutes)}
             color="bg-purple-500"
-            icon="👥"
+            icon=""
           />
           <EventTypeCard
             type="GLO"
             count={gloEvents.length}
             hours={formatHours(gloMinutes)}
             color="bg-cyan-500"
-            icon=""
+            icon="🤝"
           />
           <EventTypeCard
             type="Collegio dei Docenti"
@@ -277,14 +303,14 @@ export default function Dashboard() {
             count={dipartimentiEvents.length}
             hours={formatHours(dipartimentiMinutes)}
             color="bg-emerald-500"
-            icon=""
+            icon="📚"
           />
           <EventTypeCard
             type="Colloqui/Ricevimenti"
             count={colloquiEvents.length}
             hours={formatHours(colloquiMinutes)}
             color="bg-pink-500"
-            icon=""
+            icon="💬"
           />
         </div>
       </div>
@@ -308,10 +334,10 @@ export default function Dashboard() {
                   <div className="flex items-center gap-4">
                     <div className="text-2xl">
                       {event.type.toLowerCase().includes("consiglio") ? "👥" : 
-                       event.type.toLowerCase().includes("collegio") ? "🏛️" : 
+                       event.type.toLowerCase().includes("collegio") ? "️" : 
                        event.type.toLowerCase().includes("glo") ? "🤝" : 
                        event.type.toLowerCase().includes("dipartiment") ? "📚" : 
-                       event.type.toLowerCase().includes("colloquio") || event.type.toLowerCase().includes("famiglia") ? "" : "📌"}
+                       event.type.toLowerCase().includes("colloquio") || event.type.toLowerCase().includes("famiglia") ? "💬" : "📌"}
                     </div>
                     <div>
                       <h3 className="font-semibold text-white">{event.title}</h3>
@@ -331,7 +357,7 @@ export default function Dashboard() {
         {/* Ultima Circolare */}
         <div className="rounded-2xl bg-slate-900 p-6">
           <h2 className="mb-4 text-2xl font-semibold flex items-center gap-2">
-            <span>📄</span> Ultima Circolare
+            <span></span> Ultima Circolare
           </h2>
 
           {lastCircular ? (
@@ -350,7 +376,7 @@ export default function Dashboard() {
               </div>
               <div className="p-4 bg-blue-600/20 rounded-lg border border-blue-600/30">
                 <p className="text-sm text-blue-300">
-                   {lastCircular.events?.length || 0} eventi estratti
+                  📊 {lastCircular.events?.length || 0} eventi estratti
                 </p>
               </div>
             </div>
