@@ -80,17 +80,12 @@ export default function Dashboard() {
     localStorage.setItem("selectedSchoolYear", selectedSchoolYear);
   }, [selectedSchoolYear]);
 
-  // ✅ Filtra eventi per anno scolastico selezionato
+  // ✅ Filtra SOLO gli eventi per anno scolastico selezionato
   const filteredEvents = events.filter(e => isEventInSchoolYear(e, selectedSchoolYear));
 
-  // ✅ Filtra circolari per anno scolastico selezionato
-  const { startDate: syStart, endDate: syEnd } = getSchoolYearRange(selectedSchoolYear);
-  const filteredCirculars = circulars.filter(c => {
-    if (!c.date) return false;
-    const [day, month, year] = c.date.split("/").map(Number);
-    const circDate = new Date(year, month - 1, day);
-    return circDate >= syStart && circDate <= syEnd;
-  });
+  // ✅ Le circolari sono SEMPRE tutte (documenti archiviati, non filtrate)
+  const totalCirculars = circulars.length;
+  const totalEvents = filteredEvents.length;
 
   // ✅ FUNZIONE PER CALCOLARE I MINUTI TOTALI
   const calculateMinutes = (eventList: Event[]) => {
@@ -169,12 +164,9 @@ export default function Dashboard() {
     alertIcon = "✅";
   } else {
     alertType = "danger";
-    alertMessage = `🚨 HAI SUPERATO l'obbligo CCNL di ${formatHours(Math.abs(remainingMinutes))}!`;
+    alertMessage = ` HAI SUPERATO l'obbligo CCNL di ${formatHours(Math.abs(remainingMinutes))}!`;
     alertIcon = "🚨";
   }
-
-  const totalCirculars = filteredCirculars.length;
-  const totalEvents = filteredEvents.length;
   
   const today = new Date();
   const upcomingEvents = filteredEvents
@@ -190,7 +182,8 @@ export default function Dashboard() {
     })
     .slice(0, 5);
 
-  const lastCircular = filteredCirculars.length > 0 ? filteredCirculars[0] : null;
+  // ✅ Ultima circolare = sempre l'ultima caricata in assoluto
+  const lastCircular = circulars.length > 0 ? circulars[0] : null;
 
   if (loading) {
     return (
@@ -322,12 +315,12 @@ export default function Dashboard() {
       {/* Riepilogo Completo per Tipo */}
       <div className="rounded-2xl bg-slate-900 p-6">
         <h2 className="mb-4 text-2xl font-semibold flex items-center gap-2">
-          <span>📊</span> Riepilogo Dettagliato per Tipo di Evento - A.S. {selectedSchoolYear}
+          <span></span> Riepilogo Dettagliato per Tipo di Evento - A.S. {selectedSchoolYear}
         </h2>
 
         {totalEvents === 0 ? (
           <div className="text-center py-12 text-slate-500">
-            <p className="text-xl mb-2">📭</p>
+            <p className="text-xl mb-2"></p>
             <p>Nessun evento per l'anno scolastico {selectedSchoolYear}</p>
             <p className="text-sm mt-2">Carica le circolari dell'anno selezionato per vedere i dati</p>
           </div>
@@ -389,7 +382,7 @@ export default function Dashboard() {
                 <div key={event.id} className="flex items-center justify-between p-4 bg-slate-800 rounded-lg border border-slate-700">
                   <div className="flex items-center gap-4">
                     <div className="text-2xl">
-                      {event.type.toLowerCase().includes("consiglio") ? "👥" : 
+                      {event.type.toLowerCase().includes("consiglio") ? "" : 
                        event.type.toLowerCase().includes("collegio") ? "🏛️" : 
                        event.type.toLowerCase().includes("glo") ? "🤝" : 
                        event.type.toLowerCase().includes("dipartiment") ? "📚" : 
