@@ -21,10 +21,31 @@ type Circular = {
   events: Event[];
 };
 
+// ✅ Helper: dato "2025/2026" restituisce date di inizio e fine anno scolastico
+const getSchoolYearRange = (schoolYear: string) => {
+  const [startYear] = schoolYear.split("/").map(Number);
+  const startDate = new Date(startYear, 8, 1); // 1 Settembre startYear
+  const endDate = new Date(startYear + 1, 6, 31); // 31 Luglio startYear+1
+  return { startDate, endDate };
+};
+
+// ✅ Helper: verifica se un evento appartiene all'anno scolastico selezionato
+const isEventInSchoolYear = (event: Event, schoolYear: string) => {
+  const { startDate, endDate } = getSchoolYearRange(schoolYear);
+  const [day, month, year] = event.date.split("/").map(Number);
+  const eventDate = new Date(year, month - 1, day);
+  return eventDate >= startDate && eventDate <= endDate;
+};
+
 export default function Dashboard() {
   const [circulars, setCirculars] = useState<Circular[]>([]);
   const [events, setEvents] = useState<Event[]>([]);
   const [loading, setLoading] = useState(true);
+  
+  // ✅ Selettore Anno Scolastico
+  const [selectedSchoolYear, setSelectedSchoolYear] = useState(() => {
+    return localStorage.getItem("selectedSchoolYear") || "2025/2026";
+  });
 
   useEffect(() => {
     const fetchData = async () => {
@@ -54,6 +75,14 @@ export default function Dashboard() {
     fetchData();
   }, []);
 
+  // ✅ Salva preferenza anno scolastico
+  useEffect(() => {
+    localStorage.setItem("selectedSchoolYear", selectedSchoolYear);
+  }, [selectedSchoolYear]);
+
+  // ✅ Filtra eventi per anno scolastico selezionato
+  const filteredEvents = events.filter(e => isEventInSchoolYear(e, selectedSchoolYear));
+
   // ✅ FUNZIONE PER CALCOLARE I MINUTI TOTALI
   const calculateMinutes = (eventList: Event[]) => {
     let totalMinutes = 0;
@@ -79,17 +108,17 @@ export default function Dashboard() {
     return minutes > 0 ? `${hours}h ${minutes}m` : `${hours}h`;
   };
 
-  // ✅ FILTRI FLESSIBILI
-  const cdcEvents = events.filter(e => e.type.toLowerCase().includes("consiglio") || e.title.toLowerCase().includes("consiglio"));
+  // ✅ FILTRI FLESSIBILI (sugli eventi filtrati per anno)
+  const cdcEvents = filteredEvents.filter(e => e.type.toLowerCase().includes("consiglio") || e.title.toLowerCase().includes("consiglio"));
   const cdcMinutes = calculateMinutes(cdcEvents);
   
-  const collegiEvents = events.filter(e => e.type.toLowerCase().includes("collegio") || e.title.toLowerCase().includes("collegio"));
+  const collegiEvents = filteredEvents.filter(e => e.type.toLowerCase().includes("collegio") || e.title.toLowerCase().includes("collegio"));
   const collegiMinutes = calculateMinutes(collegiEvents);
   
-  const dipartimentiEvents = events.filter(e => e.type.toLowerCase().includes("dipartiment") || e.title.toLowerCase().includes("dipartiment"));
+  const dipartimentiEvents = filteredEvents.filter(e => e.type.toLowerCase().includes("dipartiment") || e.title.toLowerCase().includes("dipartiment"));
   const dipartimentiMinutes = calculateMinutes(dipartimentiEvents);
   
-  const gloEvents = events.filter(e => 
+  const gloEvents = filteredEvents.filter(e => 
     e.type.toLowerCase().includes("glo") || 
     e.title.toLowerCase().includes("glo") ||
     e.type.toLowerCase().includes("gruppo di lavoro") ||
@@ -97,7 +126,7 @@ export default function Dashboard() {
   );
   const gloMinutes = calculateMinutes(gloEvents);
   
-  const colloquiEvents = events.filter(e => 
+  const colloquiEvents = filteredEvents.filter(e => 
     e.type.toLowerCase().includes("colloquio") || 
     e.title.toLowerCase().includes("colloquio") ||
     e.type.toLowerCase().includes("riceviment") ||
@@ -111,46 +140,38 @@ export default function Dashboard() {
   const TARGET_CCNL_MINUTES = Math.round((40 / 18) * 12 * 60); // 1600 minuti = 26h 40m
   const currentCCNLMinutes = cdcMinutes + gloMinutes;
   const remainingMinutes = TARGET_CCNL_MINUTES - currentCCNLMinutes;
-  
-  // ✅ RIMOSSO Math.min(100, ...) - ORA PUÒ SUPERARE IL 100%
   const percentageCCNL = Math.round((currentCCNLMinutes / TARGET_CCNL_MINUTES) * 100);
   
-  // ✅ SISTEMA DI AVVISI DINAMICI
-  let alertType = "info"; // info, warning, success, danger
+  let alertType = "info";
   let alertMessage = "";
   let alertIcon = "";
   
   if (remainingMinutes > 120) {
-    // Più di 2 ore dalla soglia
     alertType = "info";
     alertMessage = `Mancano ${formatHours(remainingMinutes)} per raggiungere l'obbligo CCNL`;
     alertIcon = "ℹ️";
   } else if (remainingMinutes > 0 && remainingMinutes <= 120) {
-    // Meno di 2 ore dalla soglia
     alertType = "warning";
     alertMessage = `⚠️ ATTENZIONE: Mancano solo ${formatHours(remainingMinutes)} per completare l'obbligo CCNL!`;
     alertIcon = "⚠️";
   } else if (remainingMinutes === 0) {
-    // Esattamente alla soglia
     alertType = "success";
     alertMessage = "✅ Hai appena raggiunto l'obbligo CCNL!";
     alertIcon = "✅";
   } else {
-    // Ha superato la soglia
     alertType = "danger";
-    alertMessage = ` HAI SUPERATO l'obbligo CCNL di ${formatHours(Math.abs(remainingMinutes))}!`;
+    alertMessage = `🚨 HAI SUPERATO l'obbligo CCNL di ${formatHours(Math.abs(remainingMinutes))}!`;
     alertIcon = "🚨";
   }
 
-  // Statistiche generali
   const totalCirculars = circulars.length;
-  const totalEvents = events.length;
+  const totalEvents = filteredEvents.length;
   
-  // Prossimi eventi
   const today = new Date();
-  const upcomingEvents = events
+  const upcomingEvents = filteredEvents
     .filter(event => {
-      const eventDate = new Date(event.date.split('/').reverse().join('-'));
+      const [day, month, year] = event.date.split("/").map(Number);
+      const eventDate = new Date(year, month - 1, day);
       return eventDate >= today;
     })
     .sort((a, b) => {
@@ -173,17 +194,36 @@ export default function Dashboard() {
     );
   }
 
+  // ✅ Lista anni scolastici disponibili
+  const availableSchoolYears = ["2025/2026", "2026/2027"];
+
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div>
-        <h1 className="text-4xl font-bold">Dashboard</h1>
-        <p className="mt-2 text-slate-400">
-          Benvenuto in SchoolAgent - {new Date().toLocaleDateString('it-IT', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
-        </p>
+      {/* Header con Selettore Anno Scolastico */}
+      <div className="flex justify-between items-center">
+        <div>
+          <h1 className="text-4xl font-bold">Dashboard</h1>
+          <p className="mt-2 text-slate-400">
+            Benvenuto in SchoolAgent - {new Date().toLocaleDateString('it-IT', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+          </p>
+        </div>
+        
+        {/* ✅ SELETTORE ANNO SCOLASTICO */}
+        <div className="flex items-center gap-3">
+          <label className="text-sm text-slate-400 font-medium">Anno Scolastico:</label>
+          <select
+            value={selectedSchoolYear}
+            onChange={(e) => setSelectedSchoolYear(e.target.value)}
+            className="px-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
+          >
+            {availableSchoolYears.map(year => (
+              <option key={year} value={year}>{year}</option>
+            ))}
+          </select>
+        </div>
       </div>
 
-      {/* ✅ BANNER DI AVVISO CCNL - BARRA DINAMICA OLTRE 100% */}
+      {/* BANNER DI AVVISO CCNL */}
       <div className={`rounded-2xl p-6 border-2 ${
         alertType === "info" ? "bg-blue-900/20 border-blue-500" :
         alertType === "warning" ? "bg-yellow-900/20 border-yellow-500" :
@@ -193,7 +233,7 @@ export default function Dashboard() {
         <div className="flex items-start gap-4">
           <div className="text-4xl">{alertIcon}</div>
           <div className="flex-1">
-            <h2 className="text-xl font-bold text-white mb-2">Stato Obblighi CCNL (CDC + GLO)</h2>
+            <h2 className="text-xl font-bold text-white mb-2">Stato Obblighi CCNL (CDC + GLO) - A.S. {selectedSchoolYear}</h2>
             <p className={`text-lg font-semibold ${
               alertType === "info" ? "text-blue-400" :
               alertType === "warning" ? "text-yellow-400" :
@@ -212,7 +252,6 @@ export default function Dashboard() {
           </div>
         </div>
         
-        {/* Barra di Progresso - PUÒ SUPERARE IL 100% */}
         <div className="mt-4 w-full bg-slate-800 rounded-full h-3 overflow-hidden">
           <div 
             className={`h-3 rounded-full transition-all duration-500 ${
@@ -221,7 +260,7 @@ export default function Dashboard() {
               alertType === "success" ? "bg-green-500" :
               "bg-red-500"
             }`}
-            style={{ width: `${percentageCCNL}%` }}
+            style={{ width: `${Math.min(100, percentageCCNL)}%` }}
           ></div>
         </div>
       </div>
@@ -233,14 +272,14 @@ export default function Dashboard() {
           value={totalCirculars.toString()}
           subtitle="Totale documenti"
           color="bg-blue-500"
-          icon="📄"
+          icon=""
         />
         <Card
-          title="Eventi Totali"
+          title={`Eventi A.S. ${selectedSchoolYear}`}
           value={totalEvents.toString()}
-          subtitle="Tutti gli eventi"
+          subtitle="Eventi nell'anno selezionato"
           color="bg-green-500"
-          icon=""
+          icon="📅"
         />
         <Card
           title="Ore Consigli di Classe"
@@ -268,58 +307,65 @@ export default function Dashboard() {
           value={formatHours(dipartimentiMinutes)}
           subtitle={`${dipartimentiEvents.length} eventi`}
           color="bg-emerald-500"
-          icon="📚"
+          icon=""
         />
       </div>
 
       {/* Riepilogo Completo per Tipo */}
       <div className="rounded-2xl bg-slate-900 p-6">
         <h2 className="mb-4 text-2xl font-semibold flex items-center gap-2">
-          <span>📊</span> Riepilogo Dettagliato per Tipo di Evento
+          <span>📊</span> Riepilogo Dettagliato per Tipo di Evento - A.S. {selectedSchoolYear}
         </h2>
 
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          <EventTypeCard
-            type="Consigli di Classe"
-            count={cdcEvents.length}
-            hours={formatHours(cdcMinutes)}
-            color="bg-purple-500"
-            icon="👥"
-          />
-          <EventTypeCard
-            type="GLO"
-            count={gloEvents.length}
-            hours={formatHours(gloMinutes)}
-            color="bg-cyan-500"
-            icon="🤝"
-          />
-          <EventTypeCard
-            type="Collegio dei Docenti"
-            count={collegiEvents.length}
-            hours={formatHours(collegiMinutes)}
-            color="bg-orange-500"
-            icon="🏛️"
-          />
-          <EventTypeCard
-            type="Dipartimenti"
-            count={dipartimentiEvents.length}
-            hours={formatHours(dipartimentiMinutes)}
-            color="bg-emerald-500"
-            icon="📚"
-          />
-          <EventTypeCard
-            type="Colloqui/Ricevimenti"
-            count={colloquiEvents.length}
-            hours={formatHours(colloquiMinutes)}
-            color="bg-pink-500"
-            icon="💬"
-          />
-        </div>
+        {totalEvents === 0 ? (
+          <div className="text-center py-12 text-slate-500">
+            <p className="text-xl mb-2">📭</p>
+            <p>Nessun evento per l'anno scolastico {selectedSchoolYear}</p>
+            <p className="text-sm mt-2">Carica le circolari dell'anno selezionato per vedere i dati</p>
+          </div>
+        ) : (
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            <EventTypeCard
+              type="Consigli di Classe"
+              count={cdcEvents.length}
+              hours={formatHours(cdcMinutes)}
+              color="bg-purple-500"
+              icon="👥"
+            />
+            <EventTypeCard
+              type="GLO"
+              count={gloEvents.length}
+              hours={formatHours(gloMinutes)}
+              color="bg-cyan-500"
+              icon="🤝"
+            />
+            <EventTypeCard
+              type="Collegio dei Docenti"
+              count={collegiEvents.length}
+              hours={formatHours(collegiMinutes)}
+              color="bg-orange-500"
+              icon="🏛️"
+            />
+            <EventTypeCard
+              type="Dipartimenti"
+              count={dipartimentiEvents.length}
+              hours={formatHours(dipartimentiMinutes)}
+              color="bg-emerald-500"
+              icon="📚"
+            />
+            <EventTypeCard
+              type="Colloqui/Ricevimenti"
+              count={colloquiEvents.length}
+              hours={formatHours(colloquiMinutes)}
+              color="bg-pink-500"
+              icon="💬"
+            />
+          </div>
+        )}
       </div>
 
       {/* Prossimi Eventi e Ultima Circolare */}
       <div className="grid gap-6 xl:grid-cols-3">
-        {/* Prossimi Eventi */}
         <div className="rounded-2xl bg-slate-900 p-6 xl:col-span-2">
           <h2 className="mb-4 text-2xl font-semibold flex items-center gap-2">
             <span>📅</span> Prossimi Eventi
@@ -338,7 +384,7 @@ export default function Dashboard() {
                       {event.type.toLowerCase().includes("consiglio") ? "👥" : 
                        event.type.toLowerCase().includes("collegio") ? "🏛️" : 
                        event.type.toLowerCase().includes("glo") ? "🤝" : 
-                       event.type.toLowerCase().includes("dipartiment") ? "" : 
+                       event.type.toLowerCase().includes("dipartiment") ? "📚" : 
                        event.type.toLowerCase().includes("colloquio") || event.type.toLowerCase().includes("famiglia") ? "💬" : "📌"}
                     </div>
                     <div>
@@ -356,7 +402,6 @@ export default function Dashboard() {
           )}
         </div>
 
-        {/* Ultima Circolare */}
         <div className="rounded-2xl bg-slate-900 p-6">
           <h2 className="mb-4 text-2xl font-semibold flex items-center gap-2">
             <span>📄</span> Ultima Circolare
