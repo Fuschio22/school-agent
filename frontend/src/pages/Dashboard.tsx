@@ -37,6 +37,15 @@ const isEventInSchoolYear = (event: Event, schoolYear: string) => {
   return eventDate >= startDate && eventDate <= endDate;
 };
 
+// ✅ Helper: verifica se una circolare appartiene all'anno scolastico selezionato
+const isCircularInSchoolYear = (circular: Circular, schoolYear: string) => {
+  const { startDate, endDate } = getSchoolYearRange(schoolYear);
+  if (!circular.date) return false;
+  const [day, month, year] = circular.date.split("/").map(Number);
+  const circDate = new Date(year, month - 1, day);
+  return circDate >= startDate && circDate <= endDate;
+};
+
 export default function Dashboard() {
   const [circulars, setCirculars] = useState<Circular[]>([]);
   const [events, setEvents] = useState<Event[]>([]);
@@ -80,12 +89,11 @@ export default function Dashboard() {
     localStorage.setItem("selectedSchoolYear", selectedSchoolYear);
   }, [selectedSchoolYear]);
 
-  // ✅ Filtra SOLO gli eventi per anno scolastico selezionato
+  // ✅ Filtra eventi per anno scolastico selezionato
   const filteredEvents = events.filter(e => isEventInSchoolYear(e, selectedSchoolYear));
 
-  // ✅ Le circolari sono SEMPRE tutte (documenti archiviati, non filtrate)
-  const totalCirculars = circulars.length;
-  const totalEvents = filteredEvents.length;
+  // ✅ Filtra circolari per anno scolastico selezionato
+  const filteredCirculars = circulars.filter(c => isCircularInSchoolYear(c, selectedSchoolYear));
 
   // ✅ FUNZIONE PER CALCOLARE I MINUTI TOTALI
   const calculateMinutes = (eventList: Event[]) => {
@@ -164,9 +172,13 @@ export default function Dashboard() {
     alertIcon = "✅";
   } else {
     alertType = "danger";
-    alertMessage = ` HAI SUPERATO l'obbligo CCNL di ${formatHours(Math.abs(remainingMinutes))}!`;
+    alertMessage = `🚨 HAI SUPERATO l'obbligo CCNL di ${formatHours(Math.abs(remainingMinutes))}!`;
     alertIcon = "🚨";
   }
+
+  // ✅ Usa le circolari filtrate per anno scolastico
+  const totalCirculars = filteredCirculars.length;
+  const totalEvents = filteredEvents.length;
   
   const today = new Date();
   const upcomingEvents = filteredEvents
@@ -182,8 +194,8 @@ export default function Dashboard() {
     })
     .slice(0, 5);
 
-  // ✅ Ultima circolare = sempre l'ultima caricata in assoluto
-  const lastCircular = circulars.length > 0 ? circulars[0] : null;
+  // ✅ Ultima circolare dell'anno selezionato
+  const lastCircular = filteredCirculars.length > 0 ? filteredCirculars[0] : null;
 
   if (loading) {
     return (
@@ -271,7 +283,7 @@ export default function Dashboard() {
         <Card
           title="Circolari Caricate"
           value={totalCirculars.toString()}
-          subtitle="Totale documenti"
+          subtitle={`A.S. ${selectedSchoolYear}`}
           color="bg-blue-500"
           icon=""
         />
@@ -315,7 +327,7 @@ export default function Dashboard() {
       {/* Riepilogo Completo per Tipo */}
       <div className="rounded-2xl bg-slate-900 p-6">
         <h2 className="mb-4 text-2xl font-semibold flex items-center gap-2">
-          <span></span> Riepilogo Dettagliato per Tipo di Evento - A.S. {selectedSchoolYear}
+          <span>📊</span> Riepilogo Dettagliato per Tipo di Evento - A.S. {selectedSchoolYear}
         </h2>
 
         {totalEvents === 0 ? (
@@ -359,7 +371,7 @@ export default function Dashboard() {
               count={colloquiEvents.length}
               hours={formatHours(colloquiMinutes)}
               color="bg-pink-500"
-              icon="💬"
+              icon=""
             />
           </div>
         )}
@@ -369,7 +381,7 @@ export default function Dashboard() {
       <div className="grid gap-6 xl:grid-cols-3">
         <div className="rounded-2xl bg-slate-900 p-6 xl:col-span-2">
           <h2 className="mb-4 text-2xl font-semibold flex items-center gap-2">
-            <span>📅</span> Prossimi Eventi
+            <span></span> Prossimi Eventi
           </h2>
 
           {upcomingEvents.length === 0 ? (
@@ -382,7 +394,7 @@ export default function Dashboard() {
                 <div key={event.id} className="flex items-center justify-between p-4 bg-slate-800 rounded-lg border border-slate-700">
                   <div className="flex items-center gap-4">
                     <div className="text-2xl">
-                      {event.type.toLowerCase().includes("consiglio") ? "" : 
+                      {event.type.toLowerCase().includes("consiglio") ? "👥" : 
                        event.type.toLowerCase().includes("collegio") ? "🏛️" : 
                        event.type.toLowerCase().includes("glo") ? "🤝" : 
                        event.type.toLowerCase().includes("dipartiment") ? "📚" : 
