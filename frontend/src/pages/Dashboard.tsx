@@ -83,6 +83,15 @@ export default function Dashboard() {
   // ✅ Filtra eventi per anno scolastico selezionato
   const filteredEvents = events.filter(e => isEventInSchoolYear(e, selectedSchoolYear));
 
+  // ✅ Filtra circolari per anno scolastico selezionato
+  const { startDate: syStart, endDate: syEnd } = getSchoolYearRange(selectedSchoolYear);
+  const filteredCirculars = circulars.filter(c => {
+    if (!c.date) return false;
+    const [day, month, year] = c.date.split("/").map(Number);
+    const circDate = new Date(year, month - 1, day);
+    return circDate >= syStart && circDate <= syEnd;
+  });
+
   // ✅ FUNZIONE PER CALCOLARE I MINUTI TOTALI
   const calculateMinutes = (eventList: Event[]) => {
     let totalMinutes = 0;
@@ -164,7 +173,7 @@ export default function Dashboard() {
     alertIcon = "🚨";
   }
 
-  const totalCirculars = circulars.length;
+  const totalCirculars = filteredCirculars.length;
   const totalEvents = filteredEvents.length;
   
   const today = new Date();
@@ -181,7 +190,7 @@ export default function Dashboard() {
     })
     .slice(0, 5);
 
-  const lastCircular = circulars.length > 0 ? circulars[0] : null;
+  const lastCircular = filteredCirculars.length > 0 ? filteredCirculars[0] : null;
 
   if (loading) {
     return (
@@ -194,7 +203,6 @@ export default function Dashboard() {
     );
   }
 
-  // ✅ Lista anni scolastici disponibili
   const availableSchoolYears = ["2025/2026", "2026/2027"];
 
   return (
@@ -351,7 +359,7 @@ export default function Dashboard() {
               count={dipartimentiEvents.length}
               hours={formatHours(dipartimentiMinutes)}
               color="bg-emerald-500"
-              icon="📚"
+              icon=""
             />
             <EventTypeCard
               type="Colloqui/Ricevimenti"
