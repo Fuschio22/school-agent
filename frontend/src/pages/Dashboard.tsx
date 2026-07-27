@@ -22,9 +22,10 @@ type Circular = {
 };
 
 // ✅ Helper: dato "2025/2026" restituisce date di inizio e fine anno scolastico
+// ✅ CAMBIATO: 1 Agosto (mese 7) per includere le circolari di fine estate
 const getSchoolYearRange = (schoolYear: string) => {
   const [startYear] = schoolYear.split("/").map(Number);
-  const startDate = new Date(startYear, 8, 1); // 1 Settembre startYear
+  const startDate = new Date(startYear, 7, 1); // 1 Agosto startYear
   const endDate = new Date(startYear + 1, 6, 31); // 31 Luglio startYear+1
   return { startDate, endDate };
 };
@@ -164,7 +165,7 @@ export default function Dashboard() {
     alertIcon = "ℹ️";
   } else if (remainingMinutes > 0 && remainingMinutes <= 120) {
     alertType = "warning";
-    alertMessage = `⚠️ ATTENZIONE: Mancano solo ${formatHours(remainingMinutes)} per completare l'obbligo CCNL!`;
+    alertMessage = `️ ATTENZIONE: Mancano solo ${formatHours(remainingMinutes)} per completare l'obbligo CCNL!`;
     alertIcon = "⚠️";
   } else if (remainingMinutes === 0) {
     alertType = "success";
@@ -176,7 +177,6 @@ export default function Dashboard() {
     alertIcon = "🚨";
   }
 
-  // ✅ Usa le circolari filtrate per anno scolastico
   const totalCirculars = filteredCirculars.length;
   const totalEvents = filteredEvents.length;
   
@@ -194,7 +194,6 @@ export default function Dashboard() {
     })
     .slice(0, 5);
 
-  // ✅ Ultima circolare dell'anno selezionato
   const lastCircular = filteredCirculars.length > 0 ? filteredCirculars[0] : null;
 
   if (loading) {
@@ -285,7 +284,7 @@ export default function Dashboard() {
           value={totalCirculars.toString()}
           subtitle={`A.S. ${selectedSchoolYear}`}
           color="bg-blue-500"
-          icon=""
+          icon="📄"
         />
         <Card
           title={`Eventi A.S. ${selectedSchoolYear}`}
@@ -320,7 +319,7 @@ export default function Dashboard() {
           value={formatHours(dipartimentiMinutes)}
           subtitle={`${dipartimentiEvents.length} eventi`}
           color="bg-emerald-500"
-          icon=""
+          icon="📚"
         />
       </div>
 
@@ -332,7 +331,7 @@ export default function Dashboard() {
 
         {totalEvents === 0 ? (
           <div className="text-center py-12 text-slate-500">
-            <p className="text-xl mb-2"></p>
+            <p className="text-xl mb-2">📭</p>
             <p>Nessun evento per l'anno scolastico {selectedSchoolYear}</p>
             <p className="text-sm mt-2">Carica le circolari dell'anno selezionato per vedere i dati</p>
           </div>
@@ -350,14 +349,14 @@ export default function Dashboard() {
               count={gloEvents.length}
               hours={formatHours(gloMinutes)}
               color="bg-cyan-500"
-              icon="🤝"
+              icon=""
             />
             <EventTypeCard
               type="Collegio dei Docenti"
               count={collegiEvents.length}
               hours={formatHours(collegiMinutes)}
               color="bg-orange-500"
-              icon="🏛️"
+              icon="️"
             />
             <EventTypeCard
               type="Dipartimenti"
@@ -371,7 +370,7 @@ export default function Dashboard() {
               count={colloquiEvents.length}
               hours={formatHours(colloquiMinutes)}
               color="bg-pink-500"
-              icon=""
+              icon="💬"
             />
           </div>
         )}
@@ -381,7 +380,7 @@ export default function Dashboard() {
       <div className="grid gap-6 xl:grid-cols-3">
         <div className="rounded-2xl bg-slate-900 p-6 xl:col-span-2">
           <h2 className="mb-4 text-2xl font-semibold flex items-center gap-2">
-            <span></span> Prossimi Eventi
+            <span>📅</span> Prossimi Eventi
           </h2>
 
           {upcomingEvents.length === 0 ? (
@@ -395,10 +394,10 @@ export default function Dashboard() {
                   <div className="flex items-center gap-4">
                     <div className="text-2xl">
                       {event.type.toLowerCase().includes("consiglio") ? "👥" : 
-                       event.type.toLowerCase().includes("collegio") ? "🏛️" : 
+                       event.type.toLowerCase().includes("collegio") ? "️" : 
                        event.type.toLowerCase().includes("glo") ? "🤝" : 
                        event.type.toLowerCase().includes("dipartiment") ? "📚" : 
-                       event.type.toLowerCase().includes("colloquio") || event.type.toLowerCase().includes("famiglia") ? "💬" : "📌"}
+                       event.type.toLowerCase().includes("colloquio") || event.type.toLowerCase().includes("famiglia") ? "💬" : ""}
                     </div>
                     <div>
                       <h3 className="font-semibold text-white">{event.title}</h3>
@@ -436,7 +435,7 @@ export default function Dashboard() {
               </div>
               <div className="p-4 bg-blue-600/20 rounded-lg border border-blue-600/30">
                 <p className="text-sm text-blue-300">
-                  📊 {lastCircular.events?.length || 0} eventi estratti
+                   {lastCircular.events?.length || 0} eventi estratti
                 </p>
               </div>
             </div>

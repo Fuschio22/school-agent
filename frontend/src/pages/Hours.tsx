@@ -37,9 +37,10 @@ type MonthlyStats = {
 };
 
 // ✅ Helper: dato "2025/2026" restituisce date di inizio e fine anno scolastico
+// ✅ CAMBIATO: 1 Agosto (mese 7) per includere le circolari di fine estate
 const getSchoolYearRange = (schoolYear: string) => {
   const [startYear] = schoolYear.split("/").map(Number);
-  const startDate = new Date(startYear, 8, 1); // 1 Settembre startYear
+  const startDate = new Date(startYear, 7, 1); // 1 Agosto startYear
   const endDate = new Date(startYear + 1, 6, 31); // 31 Luglio startYear+1
   return { startDate, endDate, startYear };
 };

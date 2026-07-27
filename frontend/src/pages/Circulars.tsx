@@ -1,5 +1,4 @@
 import { useState, useEffect } from "react";
-import { useCirculars, analyzeCircular } from "../hooks/useCircular";
 import { extractTextFromPDF } from "../services/pdfService";
 import { generateICS } from "../services/icsGenerator";
 import VisualCalendar from "../components/VisualCalendar";
@@ -19,8 +18,8 @@ interface SavedCircular {
 // ✅ Helper: dato "2025/2026" restituisce date di inizio e fine anno scolastico
 const getSchoolYearRange = (schoolYear: string) => {
   const [startYear] = schoolYear.split("/").map(Number);
-  const startDate = new Date(startYear, 8, 1); // 1 Settembre startYear
-  const endDate = new Date(startYear + 1, 6, 31); // 31 Luglio startYear+1
+  const startDate = new Date(startYear, 7, 1); // ✅ 1 Agosto (mese 7) per includere circolari di fine estate
+  const endDate = new Date(startYear + 1, 6, 31); // 31 Luglio
   return { startDate, endDate };
 };
 
@@ -51,8 +50,6 @@ const renderNumberedSummary = (summary: string) => {
 };
 
 export default function Circulars() {
-  const { circulars, loading, error } = useCirculars();
-  
   const [savedCirculars, setSavedCirculars] = useState<SavedCircular[]>([]);
   const [filteredCirculars, setFilteredCirculars] = useState<SavedCircular[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -68,12 +65,6 @@ export default function Circulars() {
   useEffect(() => {
     fetchSavedCirculars();
   }, []);
-
-  useEffect(() => {
-    if (circulars && circulars.length > 0) {
-      setSavedCirculars(circulars as unknown as SavedCircular[]);
-    }
-  }, [circulars]);
 
   // ✅ Salva preferenza anno scolastico
   useEffect(() => {
@@ -159,10 +150,25 @@ export default function Circulars() {
         console.warn("Impossibile estrarre testo dal PDF, invio solo il file:", e);
       }
 
-      await analyzeCircular(file, text);
+      const formData = new FormData();
+      formData.append('file', file);
+      if (text) formData.append('text', text);
+
+      const response = await fetch("https://school-agent-backend.onrender.com/api/circulars/analyze", {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || `Errore del server: ${response.status}`);
+      }
+
       await fetchSavedCirculars();
       event.target.value = "";
+      
     } catch (err: any) {
+      console.error("Errore nell'elaborazione:", err);
       setProcessError(err.message || "Errore durante l'elaborazione del file.");
     } finally {
       setIsProcessing(false);
@@ -260,7 +266,7 @@ export default function Circulars() {
               type="file"
               accept=".pdf"
               onChange={handleFileChange}
-              disabled={isProcessing || loading}
+              disabled={isProcessing}
               className="block w-full text-sm text-transparent file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-600 file:text-white hover:file:bg-blue-700 cursor-pointer disabled:opacity-50"
             />
           </label>
@@ -269,14 +275,14 @@ export default function Circulars() {
 
       {/* Contenuto scrollabile */}
       <div className="p-6 space-y-8">
-        {(error || processError) && (
+        {processError && (
           <div className="bg-red-50 border-l-4 border-red-500 text-red-700 p-4 rounded">
             <p className="font-bold">Errore</p>
-            <p>{error || processError}</p>
+            <p>{processError}</p>
           </div>
         )}
 
-        {(loading || isProcessing) && (
+        {isProcessing && (
           <div className="flex flex-col items-center justify-center p-12 bg-gray-50 rounded-lg border border-gray-200">
             <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600"></div>
             <span className="mt-4 text-gray-600 font-medium">Elaborazione in corso...</span>
@@ -337,10 +343,10 @@ export default function Circulars() {
                       </button>
                       
                       <button onClick={() => handleDownloadPDF(circ)} className="text-xs bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 px-3 py-1.5 rounded-md transition-colors font-medium">
-                         PDF
+                        📄 PDF
                       </button>
                       <button onClick={() => handleDownloadICS(circ)} className="text-xs bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-md transition-colors font-medium">
-                         .ics
+                        📅 .ics
                       </button>
                     </div>
                   </div>
@@ -356,7 +362,7 @@ export default function Circulars() {
                     {circ.events && circ.events.length > 0 && (
                       <>
                         <h4 className="text-sm font-bold text-blue-900 mb-3 flex items-center gap-2">
-                          <span></span> Calendario Eventi ({circ.events.length})
+                          <span>📅</span> Calendario Eventi ({circ.events.length})
                         </h4>
                         <VisualCalendar events={circ.events} />
                       </>
