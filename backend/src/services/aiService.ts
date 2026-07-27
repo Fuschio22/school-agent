@@ -17,65 +17,48 @@ export async function analyzeCircularText(text: string) {
         STRUTTURA JSON OBBLIGATORIA:
         {
           "circolare": {
-            "numero": "string (es: '5', '12/A')",
-            "data": "string (es: '15/09/2025')",
-            "oggetto": "string (Estrai il testo che segue parole chiave come 'OGGETTO:', 'Oggetto:', 'Oggetto' o che rappresenta il tema principale. Se non è esplicito, riassumi brevemente il tema in una frase. NON lasciare mai vuoto!)",
+            "numero": "string (es: '5', '12/A', o 'N/D' se non presente)",
+            "data": "string (es: '26/08/2025')",
+            "oggetto": "string (Estrai il testo che segue 'OGGETTO:' o riassumi il tema principale. NON lasciare mai vuoto!)",
             "destinatari": ["array di stringhe (es: 'Docenti', 'Personale ATA', 'Genitori')"]
           },
           "eventi": [
             {
-              "title": "string (es: 'Convocazione Collegio dei Docenti', 'Consiglio di Classe 5A IPSASR')",
+              "title": "string (es: 'Convocazione Collegio dei Docenti', 'Consiglio di Classe 5A')",
               "type": "string (es: 'Collegio dei Docenti', 'Consigli di Classe', 'GLO', 'Dipartimenti', 'Scrutini', 'Colloqui')",
-              "sede": "string (Nome COMPLETO dell'istituto, es: 'Liceo Scientifico', 'IPSASR')",
+              "sede": "string (Nome dell'istituto o luogo specifico, es: 'Auditorium sede Biscollai')",
               "data": "DD/MM/YYYY",
               "oraInizio": "HH:MM",
               "oraFine": "HH:MM",
-              "classe": "string (es: '5A IPSASR', '1AS', 'Tutte' se evento generale)"
+              "classe": "string (es: '5A', '1AS', 'Tutte' se evento generale)"
             }
           ],
           "ordineDelGiorno": ["array di stringhe (punti numerati o elencati)"]
         }
 
-        REGOLE FONDAMENTALI:
+        REGOLE FONDAMENTALI PER L'ESTRAZIONE:
 
-        1. OGGETTO: Cerca attentamente parole come "OGGETTO:", "Oggetto:", "Oggetto". Se il testo inizia direttamente con il tema (es. "Convocazione del Collegio dei Docenti"), usa quello come oggetto. È VIETATO lasciare questo campo vuoto o nullo.
+        1. OGGETTO: È VIETATO lasciare questo campo vuoto. Cerca "OGGETTO:" o usa la prima frase significativa.
 
-        2. ORDINE DEL GIORNO: Estrai tutti i punti numerati o elencati nell'array "ordineDelGiorno".
+        2. ESTRAZIONE EVENTI (TESTO O TABELLA):
+           - NON cercare solo nelle tabelle! Leggi tutto il testo discorsivo.
+           - Se trovi frasi come "convocata per il giorno X alle ore Y", "riunione il giorno Z", crea un evento.
+           - Esempio: "convocata per il giorno 1 Settembre alle h. 10.30. nell’Auditorium" → Crea un evento con data "01/09/YYYY", oraInizio "10:30".
 
-        3. COERENZA DELLE DATE:
-           ✅ Controlla l'anno della circolare o della data di emissione.
-           ✅ Se una riga della tabella ha un anno mancante o palesemente sbagliato, CORREGGILO automaticamente in base al contesto.
+        3. GESTIONE ORARI (CRITICO):
+           - Se nel testo c'è SOLO l'ora di inizio (es. "h. 10.30") e manca l'ora di fine:
+             → AGGIUNGI 1 ora e 30 minuti per Collegi dei Docenti o Consigli di Classe (es. 10:30 → 12:00).
+             → AGGIUNGI 1 ora per Dipartimenti o GLO (es. 15:00 → 16:00).
+           - VERIFICA SEMPRE che oraInizio < oraFine. Non mettere mai lo stesso orario.
 
-        4. ORARI - REGOLA CRITICA E INTELLIGENTE:
-           
-           CASO A - La tabella mostra ENTRAMBI gli orari (es. "15:00 - 16:00" o "15:00 – 16:00"):
-              → Usa quelli esatti.
-           
-           CASO B - La tabella mostra SOLO l'orario di inizio (es. "15:00", "15:30", "16:00"):
-              → DEVI calcolare la durata guardando il PATTERN degli orari nella tabella.
-              → Calcola la differenza tra l'orario di inizio di un evento e quello dell'evento SUCCESSIVO.
-              → Usa quella differenza come durata per tutti gli eventi della stessa sezione.
-              
-              ESEMPI:
-              - Se vedi: 15:00, 15:45, 16:30 → differenza = 45 minuti → durata = 45 min
-                → 15:00-15:45, 15:45-16:30, 16:30-17:15
-              
-              - Se vedi: 15:00, 15:30, 16:00 → differenza = 30 minuti → durata = 30 min
-                → 15:00-15:30, 15:30-16:00, 16:00-16:30
-              
-              - Se c'è SOLO UN evento nella sezione e non puoi calcolare la differenza:
-                → Usa 60 minuti (1 ora) come durata di default per eventi come Collegi o Consigli, 45 minuti per altri.
-           
-           ✅ VERIFICA SEMPRE che oraInizio < oraFine. MAI mettere lo stesso orario per inizio e fine!
+        4. COERENZA DELLE DATE:
+           - Usa l'anno della data di emissione della circolare per correggere eventuali date incomplete negli eventi.
 
-        5. ESTRAZIONE DA TABELLE:
-           ✅ LEGGI la tabella dall'INIZIO ALLA FINE, riga per riga.
-           ✅ Crea UN evento per OGNI SINGOLA RIGA.
-           ✅ Se la sezione è "Istituto Professionale per l'Agricoltura" (o IPSASR), aggiungi " IPSASR" al campo "classe" o "sede".
-           ✅ Se la sezione è "Liceo Scientifico", aggiungi "S" alla classe (es: "1A" → "1AS").
-           ✅ Per eventi generali (es. Collegio dei Docenti), imposta "classe": "Tutte".
+        5. DESTINATARI E CLASSI:
+           - Per eventi generali (Collegio, Formazione), imposta "classe": "Tutte".
+           - Se specifico per un indirizzo (es. IPSASR, Liceo), aggiungilo al campo "classe" o "sede".
 
-        6. Restituisci SOLO JSON valido. Niente markdown, niente testo extra. Inizia direttamente con { e termina con }.
+        6. Restituisci SOLO JSON valido. Niente markdown (no \`\`\`json), niente testo extra. Inizia direttamente con { e termina con }.
 `
       },
       {
@@ -88,5 +71,16 @@ export async function analyzeCircularText(text: string) {
 
   const content = response.choices[0]?.message?.content || "{}";
   console.log("🤖 RAW AI JSON OUTPUT:", content);
-  return JSON.parse(content);
+  
+  try {
+    return JSON.parse(content);
+  } catch (error) {
+    console.error("❌ Errore nel parsing del JSON AI:", error);
+    // Fallback di sicurezza in caso di JSON malformato
+    return {
+      circolare: { numero: "N/D", data: "N/D", oggetto: "Errore parsing AI", destinatari: [] },
+      eventi: [],
+      ordineDelGiorno: []
+    };
+  }
 }
