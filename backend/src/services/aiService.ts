@@ -59,13 +59,22 @@ REGOLE FONDAMENTALI PER L'ESTRAZIONE:
    - Se trovi frasi come "convocata per il giorno X alle ore Y", crea un evento.
    - ${classesInstruction}
 
-4. GESTIONE ORARI:
+4. NORMALIZZAZIONE NOMI CLASSI (CRITICO):
+   - Se trovi classi scritte come "1 OR", "2 OR", "3 OR", "4 OR" (senza la lettera prima di OR), NORMALIZZALE aggiungendo la "A":
+     → "1 OR" diventa "1AOR"
+     → "2 OR" diventa "2AOR"
+     → "3 OR" diventa "3AOR"
+     → "4 OR" diventa "4AOR"
+   - Se trovi "5A OR" o "5B OR", normalizzale come "5AOR" e "5BOR" (senza spazio).
+   - Mantieni invariati i nomi delle altre classi (es. "1AS", "2BS", "4A IPSASR").
+
+5. GESTIONE ORARI:
    - Se nel testo c'è SOLO l'ora di inizio (es. "h. 10.30") e manca l'ora di fine:
      → AGGIUNGI 1 ora e 30 minuti per Collegi dei Docenti o Consigli di Classe.
      → AGGIUNGI 1 ora per Dipartimenti o GLO.
    - VERIFICA SEMPRE che oraInizio < oraFine.
 
-5. Restituisci SOLO JSON valido. Niente markdown (no \`\`\`json), niente testo extra. Inizia direttamente con { e termina con }.
+6. Restituisci SOLO JSON valido. Niente markdown (no \`\`\`json), niente testo extra. Inizia direttamente con { e termina con }.
 `
       },
       {
