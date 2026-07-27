@@ -18,7 +18,7 @@ interface SavedCircular {
 // ✅ Helper: dato "2025/2026" restituisce date di inizio e fine anno scolastico
 const getSchoolYearRange = (schoolYear: string) => {
   const [startYear] = schoolYear.split("/").map(Number);
-  const startDate = new Date(startYear, 7, 1); // ✅ 1 Agosto (mese 7) per includere circolari di fine estate
+  const startDate = new Date(startYear, 7, 1); // ✅ 1° Agosto (mese 7) per includere le circolari di fine estate
   const endDate = new Date(startYear + 1, 6, 31); // 31 Luglio
   return { startDate, endDate };
 };
@@ -109,7 +109,7 @@ export default function Circulars() {
 
   const handleDeleteCircular = async (id: string, numero: string) => {
     const confirmed = window.confirm(
-      `️ Sei sicuro di voler eliminare la Circolare n. ${numero}?\n\nQuesta azione eliminerà anche tutti gli eventi associati e non potrà essere annullata.`
+      `⚠️ Sei sicuro di voler eliminare la Circolare n. ${numero}?\n\nQuesta azione eliminerà anche tutti gli eventi associati e non potrà essere annullata.`
     );
 
     if (!confirmed) return;
@@ -151,7 +151,8 @@ export default function Circulars() {
       }
 
       const formData = new FormData();
-      formData.append('file', file);
+      // ✅ CORREZIONE CRUCIALE: il backend si aspetta il campo chiamato 'pdf', non 'file'
+      formData.append('pdf', file); 
       if (text) formData.append('text', text);
 
       const response = await fetch("https://school-agent-backend.onrender.com/api/circulars/analyze", {
@@ -165,12 +166,13 @@ export default function Circulars() {
       }
 
       await fetchSavedCirculars();
-      event.target.value = "";
+      event.target.value = ""; // Resetta il campo di input
       
     } catch (err: any) {
       console.error("Errore nell'elaborazione:", err);
       setProcessError(err.message || "Errore durante l'elaborazione del file.");
     } finally {
+      // ✅ Garantisce che la rotellina si fermi SEMPRE, anche in caso di errore
       setIsProcessing(false);
     }
   };
@@ -333,11 +335,11 @@ export default function Circulars() {
                       >
                         {isDeleting === circ.id ? (
                           <>
-                            <span className="animate-spin"></span> Elimino...
+                            <span className="animate-spin mr-1"></span> Elimino...
                           </>
                         ) : (
                           <>
-                            <span>️</span> Elimina
+                            <span>🗑️</span> Elimina
                           </>
                         )}
                       </button>
