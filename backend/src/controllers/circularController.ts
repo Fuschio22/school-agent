@@ -14,7 +14,6 @@ function extractMonthYear(text: string): { month: string; year: string } | null 
   
   for (const month of months) {
     if (lowerText.includes(month)) {
-      // Cerca l'anno (4 cifre)
       const yearMatch = text.match(/\b(20\d{2})\b/);
       if (yearMatch) {
         return { month, year: yearMatch[1] };
@@ -41,7 +40,6 @@ function isRettifica(text: string): boolean {
          lowerText.includes("annulla e sostituisce");
 }
 
-// Funzione 1: Analizza e salva (o aggiorna) una circolare
 export const analyzeCircularController = async (req: Request, res: Response) => {
   try {
     const { text, fileName } = req.body;
@@ -53,15 +51,25 @@ export const analyzeCircularController = async (req: Request, res: Response) => 
 
     console.log("📄 File salvato fisicamente in:", filePath);
 
-    const analysis = await analyzeCircularText(text);
-    console.log("🤖 AI estrazione completata");
-
+    // ✅ 1. RECUPERA PRIMA L'UTENTE PER OTTENERE LE CLASSI
     let user = await prisma.user.findUnique({ where: { email: "demo@schoolagent.it" } });
     if (!user) {
       user = await prisma.user.create({
-        data: { email: "demo@schoolagent.it", name: "Utente Demo", classes: [] }
+        // Fallback con le tue classi se l'utente non esiste ancora
+        data: { 
+          email: "demo@schoolagent.it", 
+          name: "Utente Demo", 
+          classes: ["1AOR", "2AOR", "3AOR", "4AOR", "5AOR", "5BOR"] 
+        }
       });
     }
+
+    const userClasses = user.classes || [];
+    console.log(`👤 Classi configurate dall'utente per il filtro AI:`, userClasses);
+
+    // ✅ 2. CHIAMA L'AI PASSANDO LE CLASSI DELL'UTENTE
+    const analysis = await analyzeCircularText(text, userClasses);
+    console.log("🤖 AI estrazione completata");
 
     const circData = analysis.circolare || analysis;
     const eventsData = Array.isArray(analysis.eventi) 
@@ -69,11 +77,7 @@ export const analyzeCircularController = async (req: Request, res: Response) => 
       : (Array.isArray(analysis.consigliDiClasse) ? analysis.consigliDiClasse : []);
     const orderOfDay = Array.isArray(analysis.ordineDelGiorno) ? analysis.ordineDelGiorno : [];
 
-    // 🌟 NUOVO: Recupera le classi configurate dall'utente nelle Impostazioni
-    const userClasses = user.classes || [];
-    console.log(`👤 Classi configurate dall'utente:`, userClasses);
-
-    // 🌟 NUOVO: Applichiamo il filtro passando le classi dinamiche dell'utente
+    // ✅ 3. SAFETY NET: Applichiamo anche il filtro backend per doppia sicurezza
     const filteredEventsData = filterEvents(eventsData, userClasses);
 
     // 🛡️ VALIDAZIONE: Correggi orari invertiti
@@ -85,7 +89,6 @@ export const analyzeCircularController = async (req: Request, res: Response) => 
         const minutiInizio = hInizio * 60 + mInizio;
         const minutiFine = hFine * 60 + mFine;
         
-        // Se l'ora di fine è prima o uguale all'inizio, aggiungi 45 minuti all'inizio
         if (minutiFine <= minutiInizio) {
           const nuoviMinutiFine = minutiInizio + 45;
           const nuoveOre = Math.floor(nuoviMinutiFine / 60);
@@ -103,13 +106,12 @@ export const analyzeCircularController = async (req: Request, res: Response) => 
       return event;
     });
 
-    console.log(`🔍 Filtro applicato: da ${eventsData.length} eventi estratti a ${validatedEventsData.length} eventi permessi.`);
+    console.log(`🔍 Filtro applicato: da ${eventsData.length} eventi estratti dall'AI a ${validatedEventsData.length} eventi finali permessi.`);
 
     const numeroCircolare = String(circData.numero || "");
     const dataCircolare = String(circData.data || "");
     const oggetto = String(circData.oggetto || "");
 
-    // Controlla se è una rettifica
     const rettifica = isRettifica(oggetto);
     console.log(`📝 È una rettifica? ${rettifica}`);
 
@@ -118,13 +120,9 @@ export const analyzeCircularController = async (req: Request, res: Response) => 
     let relevantCirculars: any[] = [];
 
     if (rettifica) {
-      // Se è una rettifica, cerca circolari simili per sostituire
       const monthYear = extractMonthYear(oggetto);
-      
       if (monthYear) {
         console.log(`🔍 Cerco eventi da sostituire per: ${monthYear.month} ${monthYear.year}`);
-        
-        // Cerca tutte le circolari che hanno eventi nello stesso mese/anno
         const similarCirculars = await prisma.circular.findMany({
           include: { events: true },
           where: {
@@ -136,7 +134,6 @@ export const analyzeCircularController = async (req: Request, res: Response) => 
           }
         });
 
-        // Filtra solo quelle dello stesso mese/anno
         relevantCirculars = similarCirculars.filter(circ => {
           const circMonthYear = extractMonthYear(circ.subject);
           return circMonthYear && 
@@ -146,18 +143,13 @@ export const analyzeCircularController = async (req: Request, res: Response) => 
 
         if (relevantCirculars.length > 0) {
           console.log(`📋 Trovate ${relevantCirculars.length} circolari da sostituire`);
-          
-          // Raccogli tutti gli eventi da cancellare
           for (const circ of relevantCirculars) {
             eventsToDelete = eventsToDelete.concat(circ.events.map((e: any) => e.id));
           }
-          
-          // Usa l'ultima circolare trovata come riferimento
           existingCircular = relevantCirculars[relevantCirculars.length - 1];
         }
       }
     } else {
-      // Se NON è una rettifica, usa la logica anti-duplicato normale
       existingCircular = await prisma.circular.findFirst({
         where: {
           number: numeroCircolare,
@@ -167,14 +159,12 @@ export const analyzeCircularController = async (req: Request, res: Response) => 
       });
     }
 
-    // Se esistono eventi da cancellare (rettifica), cancellali
     if (eventsToDelete.length > 0) {
-      console.log(`️ Cancello ${eventsToDelete.length} eventi vecchi`);
+      console.log(`🗑️ Cancello ${eventsToDelete.length} eventi vecchi`);
       await prisma.event.deleteMany({
         where: { id: { in: eventsToDelete } }
       });
       
-      // Cancella le circolari vecchie se abbiamo trovato circolari rilevanti
       if (relevantCirculars.length > 0) {
         await prisma.circular.deleteMany({
           where: { id: { in: relevantCirculars.map(c => c.id) } }
@@ -182,7 +172,6 @@ export const analyzeCircularController = async (req: Request, res: Response) => 
       }
     }
 
-    // Se esiste già una circolare con lo stesso numero/data (non rettifica)
     if (existingCircular && !rettifica) {
       await prisma.event.deleteMany({
         where: { circularId: existingCircular.id }
@@ -215,7 +204,6 @@ export const analyzeCircularController = async (req: Request, res: Response) => 
       return res.json(updatedCircular);
     }
 
-    // CREA NUOVA CIRCOLARE (o rettifica che sostituisce le vecchie)
     const circular = await prisma.circular.create({
       data: {
         fileName: fileName || "documento.pdf",
@@ -252,7 +240,6 @@ export const analyzeCircularController = async (req: Request, res: Response) => 
   }
 };
 
-// Funzione 2: Recupera tutte le circolari salvate (Archivio)
 export const getAllCircularsController = async (req: Request, res: Response) => {
   try {
     const circulars = await prisma.circular.findMany({
@@ -266,12 +253,10 @@ export const getAllCircularsController = async (req: Request, res: Response) => 
   }
 };
 
-// Funzione 3: Elimina una circolare
 export const deleteCircularController = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
 
-    // Verifica che la circolare esista
     const circular = await prisma.circular.findUnique({
       where: { id },
       include: { events: true }
@@ -281,12 +266,10 @@ export const deleteCircularController = async (req: Request, res: Response) => {
       return res.status(404).json({ error: "Circolare non trovata" });
     }
 
-    // Elimina prima tutti gli eventi associati
     await prisma.event.deleteMany({
       where: { circularId: id }
     });
 
-    // Poi elimina la circolare
     await prisma.circular.delete({
       where: { id }
     });
