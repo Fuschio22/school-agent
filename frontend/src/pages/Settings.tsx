@@ -3,13 +3,14 @@ import { useState, useEffect } from "react";
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "https://school-agent-backend.onrender.com";
 
 export default function Settings() {
-  const [classesInput, setClassesInput] = useState("");
+  const [liceoClassesInput, setLiceoClassesInput] = useState("");
+  const [orClassesInput, setOrClassesInput] = useState("");
   const [savedClasses, setSavedClasses] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
 
-  // Carica le classi salvate all'avvio
+  // Carica le classi salvate all'avvio e le divide nelle due sezioni
   useEffect(() => {
     const fetchClasses = async () => {
       try {
@@ -17,7 +18,13 @@ export default function Settings() {
         const data = await response.json();
         if (data.classes) {
           setSavedClasses(data.classes);
-          setClassesInput(data.classes.join(", "));
+          
+          // ✅ Divide automaticamente le classi in due gruppi
+          const liceoClasses = data.classes.filter((c: string) => !c.toUpperCase().endsWith("OR"));
+          const orClasses = data.classes.filter((c: string) => c.toUpperCase().endsWith("OR"));
+          
+          setLiceoClassesInput(liceoClasses.join(", "));
+          setOrClassesInput(orClasses.join(", "));
         }
       } catch (error) {
         console.error("Errore nel recupero delle classi:", error);
@@ -29,16 +36,24 @@ export default function Settings() {
     fetchClasses();
   }, []);
 
-  // Salva le classi
+  // Salva le classi (unisce le due sezioni in un unico array)
   const handleSave = async () => {
     setSaving(true);
     setMessage("");
     
-    // Trasforma la stringa separata da virgole in un array pulito
-    const classesArray = classesInput
+    // ✅ Trasforma i due input in un unico array pulito
+    const liceoArray = liceoClassesInput
       .split(",")
       .map(c => c.trim())
       .filter(c => c.length > 0);
+      
+    const orArray = orClassesInput
+      .split(",")
+      .map(c => c.trim())
+      .filter(c => c.length > 0);
+      
+    // Unisce le due liste (Liceo prima, OR dopo)
+    const classesArray = [...liceoArray, ...orArray];
 
     try {
       const response = await fetch(`${BACKEND_URL}/api/users/classes`, {
@@ -74,48 +89,100 @@ export default function Settings() {
   }
 
   return (
-    <div className="p-8 max-w-2xl mx-auto">
+    <div className="p-8 max-w-3xl mx-auto">
       <h1 className="text-4xl font-bold mb-6">Impostazioni</h1>
 
-      <div className="bg-slate-900 border border-slate-800 rounded-lg p-6">
-        <h2 className="text-xl font-semibold mb-4 text-blue-400">Le mie Classi</h2>
-        <p className="text-slate-400 mb-4 text-sm">
-          Inserisci le classi di cui sei titolare o che ti interessano, separate da virgola. 
-          Il sistema userà questo elenco per filtrare il Calendario e rispondere alle domande della Chat.
-        </p>
-
-        <textarea
-          value={classesInput}
-          onChange={(e) => setClassesInput(e.target.value)}
-          placeholder="Es: 3A, 4B, 5C, 2D"
-          className="w-full bg-slate-950 border border-slate-700 rounded-lg p-3 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 mb-4"
-          rows={3}
-        />
-
-        <button
-          onClick={handleSave}
-          disabled={saving}
-          className="bg-blue-600 hover:bg-blue-700 disabled:bg-slate-700 disabled:cursor-not-allowed text-white px-6 py-2 rounded-lg font-semibold transition-all flex items-center gap-2"
-        >
-          {saving ? "Salvataggio in corso..." : "💾 Salva Classi"}
-        </button>
-
-        {message && (
-          <p className={`mt-4 text-sm font-medium ${message.includes("✅") ? "text-green-400" : "text-red-400"}`}>
-            {message}
+      <div className="bg-slate-900 border border-slate-800 rounded-lg p-6 space-y-6">
+        
+        {/* ✅ SEZIONE 1: CLASSI LICEO */}
+        <div>
+          <h2 className="text-xl font-semibold mb-2 text-blue-400 flex items-center gap-2">
+            <span></span> Classi Liceo
+          </h2>
+          <p className="text-slate-400 mb-3 text-sm">
+            Classi del Liceo Scientifico, IPSASR e altri indirizzi (escluse le classi OR).
           </p>
-        )}
 
+          <textarea
+            value={liceoClassesInput}
+            onChange={(e) => setLiceoClassesInput(e.target.value)}
+            placeholder="Es: 1AS, 2AS, 3AS, 4AS, 5AS, 1BS, 2BS, 3BS, 4BS, 5BS, 4A IPSASR, 5A IPSASR"
+            className="w-full bg-slate-950 border border-slate-700 rounded-lg p-3 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+            rows={3}
+          />
+        </div>
+
+        {/* ✅ SEZIONE 2: CLASSI OR */}
+        <div>
+          <h2 className="text-xl font-semibold mb-2 text-emerald-400 flex items-center gap-2">
+            <span>🚌</span> Classi OR
+          </h2>
+          <p className="text-slate-400 mb-3 text-sm">
+            Classi dell'indirizzo OR (es: 1AOR, 2AOR, 3AOR, 4AOR, 5AOR, 5BOR).
+          </p>
+
+          <textarea
+            value={orClassesInput}
+            onChange={(e) => setOrClassesInput(e.target.value)}
+            placeholder="Es: 1AOR, 2AOR, 3AOR, 4AOR, 5AOR, 5BOR"
+            className="w-full bg-slate-950 border border-slate-700 rounded-lg p-3 text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+            rows={2}
+          />
+        </div>
+
+        {/* ✅ BOTTONE SALVA */}
+        <div>
+          <button
+            onClick={handleSave}
+            disabled={saving}
+            className="bg-blue-600 hover:bg-blue-700 disabled:bg-slate-700 disabled:cursor-not-allowed text-white px-6 py-2 rounded-lg font-semibold transition-all flex items-center gap-2"
+          >
+            {saving ? "Salvataggio in corso..." : "💾 Salva Classi"}
+          </button>
+
+          {message && (
+            <p className={`mt-4 text-sm font-medium ${message.includes("✅") ? "text-green-400" : "text-red-400"}`}>
+              {message}
+            </p>
+          )}
+        </div>
+
+        {/* ✅ ANTEPRIMA CLASSI SALVATE (divise in due sezioni) */}
         {savedClasses.length > 0 && (
-          <div className="mt-6">
-            <h3 className="text-sm font-semibold text-slate-400 mb-2">Classi attualmente salvate:</h3>
-            <div className="flex flex-wrap gap-2">
-              {savedClasses.map((cls, index) => (
-                <span key={index} className="bg-blue-600/20 text-blue-300 border border-blue-600/30 px-3 py-1 rounded-full text-sm">
-                  {cls}
-                </span>
-              ))}
-            </div>
+          <div className="mt-6 pt-6 border-t border-slate-800">
+            <h3 className="text-sm font-semibold text-slate-400 mb-3">Classi attualmente salvate:</h3>
+            
+            {/* Classi Liceo */}
+            {savedClasses.filter(c => !c.toUpperCase().endsWith("OR")).length > 0 && (
+              <div className="mb-3">
+                <p className="text-xs text-blue-400 font-medium mb-2">🏫 Liceo:</p>
+                <div className="flex flex-wrap gap-2">
+                  {savedClasses
+                    .filter(c => !c.toUpperCase().endsWith("OR"))
+                    .map((cls, index) => (
+                      <span key={index} className="bg-blue-600/20 text-blue-300 border border-blue-600/30 px-3 py-1 rounded-full text-sm">
+                        {cls}
+                      </span>
+                    ))}
+                </div>
+              </div>
+            )}
+            
+            {/* Classi OR */}
+            {savedClasses.filter(c => c.toUpperCase().endsWith("OR")).length > 0 && (
+              <div>
+                <p className="text-xs text-emerald-400 font-medium mb-2">🚌 OR:</p>
+                <div className="flex flex-wrap gap-2">
+                  {savedClasses
+                    .filter(c => c.toUpperCase().endsWith("OR"))
+                    .map((cls, index) => (
+                      <span key={index} className="bg-emerald-600/20 text-emerald-300 border border-emerald-600/30 px-3 py-1 rounded-full text-sm">
+                        {cls}
+                      </span>
+                    ))}
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>
