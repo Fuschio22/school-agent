@@ -22,7 +22,7 @@ export default function Calendar() {
   useEffect(() => {
     const fetchEvents = async () => {
       try {
-        const response = await fetch(`${BACKEND_URL}/api/circulars`);
+        const response = await fetch(`${BACKEND_URL}/api/circulars?t=${Date.now()}`);
         const data = await response.json();
         
         const allEvents: Event[] = [];
@@ -66,7 +66,11 @@ export default function Calendar() {
     const firstDay = new Date(year, month, 1);
     const lastDay = new Date(year, month + 1, 0);
     const daysInMonth = lastDay.getDate();
-    const startingDayOfWeek = firstDay.getDay();
+    
+    // getDay() restituisce 0 per Domenica, 1 per Lunedì, ..., 6 per Sabato
+    let startingDayOfWeek = firstDay.getDay();
+    // Convertiamo: Lunedì=0, Martedì=1, ..., Domenica=6
+    startingDayOfWeek = startingDayOfWeek === 0 ? 6 : startingDayOfWeek - 1;
     
     return { daysInMonth, startingDayOfWeek };
   };
@@ -86,7 +90,9 @@ export default function Calendar() {
 
   const { daysInMonth, startingDayOfWeek } = getDaysInMonth(currentDate);
   const monthNames = ["Gennaio", "Febbraio", "Marzo", "Aprile", "Maggio", "Giugno", "Luglio", "Agosto", "Settembre", "Ottobre", "Novembre", "Dicembre"];
-  const dayNames = ["Dom", "Lun", "Mar", "Mer", "Gio", "Ven", "Sab"];
+  
+  // ✅ MODIFICA: Inizia da Lunedì
+  const dayNames = ["Lun", "Mar", "Mer", "Gio", "Ven", "Sab", "Dom"];
 
   const prevMonth = () => {
     setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1));
