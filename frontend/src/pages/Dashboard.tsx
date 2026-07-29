@@ -22,7 +22,6 @@ type Circular = {
 };
 
 // ✅ Helper: dato "2025/2026" restituisce date di inizio e fine anno scolastico
-// ✅ CAMBIATO: 1 Agosto (mese 7) per includere le circolari di fine estate
 const getSchoolYearRange = (schoolYear: string) => {
   const [startYear] = schoolYear.split("/").map(Number);
   const startDate = new Date(startYear, 7, 1); // 1 Agosto startYear
@@ -60,9 +59,11 @@ export default function Dashboard() {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const response = await fetch(`${BACKEND_URL}/api/circulars`);
+        // ✅ CACHE-BUSTER: Aggiunge un timestamp per forzare il browser a scaricare dati freschi
+        const response = await fetch(`${BACKEND_URL}/api/circulars?t=${Date.now()}`);
         const data = await response.json();
         
+        console.log("📊 DEBUG Dashboard - Circolari totali dal backend:", data.length);
         setCirculars(data);
         
         const allEvents: Event[] = [];
@@ -74,6 +75,7 @@ export default function Dashboard() {
           }
         });
         
+        console.log("📊 DEBUG Dashboard - Eventi totali dal backend:", allEvents.length);
         setEvents(allEvents);
       } catch (error) {
         console.error("Errore nel recupero dati:", error);
@@ -95,6 +97,8 @@ export default function Dashboard() {
 
   // ✅ Filtra circolari per anno scolastico selezionato
   const filteredCirculars = circulars.filter(c => isCircularInSchoolYear(c, selectedSchoolYear));
+
+  console.log("📊 DEBUG Dashboard - Circolari filtrate per l'anno:", filteredCirculars.length);
 
   // ✅ FUNZIONE PER CALCOLARE I MINUTI TOTALI
   const calculateMinutes = (eventList: Event[]) => {
@@ -165,7 +169,7 @@ export default function Dashboard() {
     alertIcon = "ℹ️";
   } else if (remainingMinutes > 0 && remainingMinutes <= 120) {
     alertType = "warning";
-    alertMessage = `️ ATTENZIONE: Mancano solo ${formatHours(remainingMinutes)} per completare l'obbligo CCNL!`;
+    alertMessage = `⚠️ ATTENZIONE: Mancano solo ${formatHours(remainingMinutes)} per completare l'obbligo CCNL!`;
     alertIcon = "⚠️";
   } else if (remainingMinutes === 0) {
     alertType = "success";
@@ -349,21 +353,21 @@ export default function Dashboard() {
               count={gloEvents.length}
               hours={formatHours(gloMinutes)}
               color="bg-cyan-500"
-              icon=""
+              icon="🤝"
             />
             <EventTypeCard
               type="Collegio dei Docenti"
               count={collegiEvents.length}
               hours={formatHours(collegiMinutes)}
               color="bg-orange-500"
-              icon="️"
+              icon="🏛️"
             />
             <EventTypeCard
               type="Dipartimenti"
               count={dipartimentiEvents.length}
               hours={formatHours(dipartimentiMinutes)}
               color="bg-emerald-500"
-              icon=""
+              icon="📚"
             />
             <EventTypeCard
               type="Colloqui/Ricevimenti"
@@ -394,10 +398,10 @@ export default function Dashboard() {
                   <div className="flex items-center gap-4">
                     <div className="text-2xl">
                       {event.type.toLowerCase().includes("consiglio") ? "👥" : 
-                       event.type.toLowerCase().includes("collegio") ? "️" : 
+                       event.type.toLowerCase().includes("collegio") ? "🏛️" : 
                        event.type.toLowerCase().includes("glo") ? "🤝" : 
                        event.type.toLowerCase().includes("dipartiment") ? "📚" : 
-                       event.type.toLowerCase().includes("colloquio") || event.type.toLowerCase().includes("famiglia") ? "💬" : ""}
+                       event.type.toLowerCase().includes("colloquio") || event.type.toLowerCase().includes("famiglia") ? "💬" : "📅"}
                     </div>
                     <div>
                       <h3 className="font-semibold text-white">{event.title}</h3>
