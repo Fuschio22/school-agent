@@ -20,7 +20,7 @@ type VisualCalendarProps = {
 
 export default function VisualCalendar({ events, circularId, onEventUpdated }: VisualCalendarProps) {
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingIndex, setEditingIndex] = useState<number | null>(null);
+  const [editingIndex, setEditingIndex] = useState<number>(-1);
   
   const [formData, setFormData] = useState({
     title: "",
@@ -30,7 +30,10 @@ export default function VisualCalendar({ events, circularId, onEventUpdated }: V
     endTime: "",
   });
 
+  console.log("📊 VisualCalendar props:", { events, circularId, eventsCount: events.length });
+
   const handleEditClick = (event: Event, index: number) => {
+    console.log("️ Click su Modifica - Index:", index, "Event:", event);
     setEditingIndex(index);
     setFormData({
       title: event.title,
@@ -43,38 +46,51 @@ export default function VisualCalendar({ events, circularId, onEventUpdated }: V
   };
 
   const handleSave = async () => {
-    if (editingIndex === null || !circularId) return;
+    console.log("💾 Tentativo di salvataggio - Index:", editingIndex, "CircularId:", circularId);
+    
+    if (editingIndex < 0 || !circularId) {
+      console.error("❌ Parametri invalidi:", { editingIndex, circularId });
+      alert(`❌ Errore: Indice=${editingIndex}, CircularId=${circularId}`);
+      return;
+    }
 
     try {
-      const response = await fetch(
-        `https://school-agent-backend.onrender.com/api/circulars/${circularId}/events/${editingIndex}`,
-        {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            title: formData.title,
-            type: formData.type,
-            sede: formData.sede,
-            location: formData.sede,
-            oraInizio: formData.startTime,
-            oraFine: formData.endTime,
-          }),
-        }
-      );
+      const url = `https://school-agent-backend.onrender.com/api/circulars/${circularId}/events/${editingIndex}`;
+      console.log("🌐 Chiamata API:", url);
+      
+      const body = {
+        title: formData.title,
+        type: formData.type,
+        sede: formData.sede,
+        location: formData.sede,
+        oraInizio: formData.startTime,
+        oraFine: formData.endTime,
+      };
+      
+      console.log("📦 Body:", body);
+
+      const response = await fetch(url, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+
+      console.log("📥 Response status:", response.status);
+      const responseData = await response.json();
+      console.log("📥 Response data:", responseData);
 
       if (response.ok) {
         alert("✅ Evento aggiornato con successo!");
         setIsModalOpen(false);
-        setEditingIndex(null);
+        setEditingIndex(-1);
         if (onEventUpdated) {
           onEventUpdated();
         }
       } else {
-        const err = await response.json();
-        alert(`❌ Errore: ${err.error || "Impossibile aggiornare l'evento"}`);
+        alert(`❌ Errore: ${responseData.error || "Impossibile aggiornare l'evento"}`);
       }
     } catch (error) {
-      console.error("Errore di rete:", error);
+      console.error("❌ Errore di rete:", error);
       alert("❌ Errore di connessione al server");
     }
   };
@@ -100,12 +116,15 @@ export default function VisualCalendar({ events, circularId, onEventUpdated }: V
             </div>
             <div className="text-sm text-blue-700 flex items-center gap-4">
               <span>🕒 {event.startTime} - {event.endTime}</span>
-              <span> {event.location || event.sede || "Sede non specificata"}</span>
+              <span>📍 {event.location || event.sede || "Sede non specificata"}</span>
             </div>
           </div>
           
           <button
-            onClick={() => handleEditClick(event, index)}
+            onClick={() => {
+              console.log(" Button clicked for index:", index);
+              handleEditClick(event, index);
+            }}
             className="ml-4 text-blue-600 hover:text-blue-800 hover:bg-blue-100 p-2 rounded-lg transition-colors"
             title="Modifica questo evento"
           >
@@ -115,7 +134,7 @@ export default function VisualCalendar({ events, circularId, onEventUpdated }: V
       ))}
 
       {/* MODALE DI MODIFICA */}
-      {isModalOpen && editingIndex !== null && (
+      {isModalOpen && editingIndex >= 0 && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
           <div className="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl border border-gray-200">
             <h3 className="text-xl font-bold mb-4 text-gray-800 flex items-center gap-2">
@@ -188,10 +207,10 @@ export default function VisualCalendar({ events, circularId, onEventUpdated }: V
                 onClick={handleSave}
                 className="flex-1 bg-blue-600 text-white py-2.5 rounded-lg hover:bg-blue-700 font-semibold transition-colors"
               >
-                 Salva Modifiche
+                💾 Salva Modifiche
               </button>
               <button
-                onClick={() => { setIsModalOpen(false); setEditingIndex(null); }}
+                onClick={() => { setIsModalOpen(false); setEditingIndex(-1); }}
                 className="flex-1 bg-gray-200 text-gray-700 py-2.5 rounded-lg hover:bg-gray-300 font-semibold transition-colors"
               >
                 Annulla
