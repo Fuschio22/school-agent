@@ -289,7 +289,7 @@ export default function Circulars() {
                 : "bg-blue-600 text-white hover:bg-blue-700 hover:shadow-md active:scale-95"
             }`}
           >
-            <span>📁</span>
+            <span></span>
             {isProcessing ? "Elaborazione in corso..." : "Scegli il file PDF"}
           </label>
         </div>
@@ -318,7 +318,7 @@ export default function Circulars() {
 
         <div className="bg-white shadow-sm border border-gray-200 rounded-lg p-6">
           <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
-            <span>🗄️</span> Archivio Circolari A.S. {selectedSchoolYear} ({filteredCirculars.length})
+            <span>️</span> Archivio Circolari A.S. {selectedSchoolYear} ({filteredCirculars.length})
           </h2>
           
           {filteredCirculars.length === 0 ? (
@@ -348,7 +348,7 @@ export default function Circulars() {
                       >
                         {isDeleting === circ.id ? "Elimino..." : "🗑️ Elimina"}
                       </button>
-                      <button onClick={() => handleDownloadPDF(circ)} className="text-xs bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 px-3 py-1.5 rounded-md transition-colors font-medium">📄 PDF</button>
+                      <button onClick={() => handleDownloadPDF(circ)} className="text-xs bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 px-3 py-1.5 rounded-md transition-colors font-medium"> PDF</button>
                       <button onClick={() => handleDownloadICS(circ)} className="text-xs bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-md transition-colors font-medium">📅 .ics</button>
                     </div>
                   </div>

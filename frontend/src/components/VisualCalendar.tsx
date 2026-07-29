@@ -55,9 +55,9 @@ export default function VisualCalendar({ events, circularId, onEventUpdated }: V
             title: formData.title,
             type: formData.type,
             sede: formData.sede,
-            location: formData.sede, // Mappiamo anche location per sicurezza
-            oraInizio: formData.startTime, // Nome atteso dal backend
-            oraFine: formData.endTime,     // Nome atteso dal backend
+            location: formData.sede,
+            oraInizio: formData.startTime,
+            oraFine: formData.endTime,
           }),
         }
       );
@@ -67,7 +67,7 @@ export default function VisualCalendar({ events, circularId, onEventUpdated }: V
         setIsModalOpen(false);
         setEditingEvent(null);
         if (onEventUpdated) {
-          onEventUpdated(); // Ricarica i dati nella pagina padre
+          onEventUpdated();
         }
       } else {
         const err = await response.json();
@@ -129,7 +129,7 @@ export default function VisualCalendar({ events, circularId, onEventUpdated }: V
                   type="text"
                   value={formData.title}
                   onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 placeholder-gray-400 bg-white"
                 />
               </div>
 
@@ -138,7 +138,7 @@ export default function VisualCalendar({ events, circularId, onEventUpdated }: V
                 <select
                   value={formData.type}
                   onChange={(e) => setFormData({ ...formData, type: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-gray-900"
                 >
                   <option value="Consigli di Classe">Consigli di Classe</option>
                   <option value="Collegio dei Docenti">Collegio dei Docenti</option>
@@ -156,7 +156,7 @@ export default function VisualCalendar({ events, circularId, onEventUpdated }: V
                   type="text"
                   value={formData.sede}
                   onChange={(e) => setFormData({ ...formData, sede: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 placeholder-gray-400 bg-white"
                   placeholder="es. Sede Biscollai, Via Toscana, ecc."
                 />
               </div>
@@ -168,7 +168,7 @@ export default function VisualCalendar({ events, circularId, onEventUpdated }: V
                     type="time"
                     value={formData.startTime}
                     onChange={(e) => setFormData({ ...formData, startTime: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 bg-white"
                   />
                 </div>
                 <div>
@@ -177,7 +177,7 @@ export default function VisualCalendar({ events, circularId, onEventUpdated }: V
                     type="time"
                     value={formData.endTime}
                     onChange={(e) => setFormData({ ...formData, endTime: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 bg-white"
                   />
                 </div>
               </div>
