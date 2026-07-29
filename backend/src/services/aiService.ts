@@ -20,7 +20,7 @@ export async function analyzeCircularText(text: string, userClasses: string[] = 
   
   if (isChironi && !isPira) {
     relevantClasses = userClasses.filter(c => c.toUpperCase().includes("OR"));
-    schoolContext = "\n\n🏫 SCUOLA: CHIRONI-SATTA (Nuoro)\n" +
+    schoolContext = "\n\n SCUOLA: CHIRONI-SATTA (Nuoro)\n" +
                    `CLASSI RILEVANTI: ${relevantClasses.join(', ')}\n` +
                    "ISTRUZIONE: Estrai SOLO eventi per queste classi OR. Ignora tutte le altre.";
     schoolName = "ITC Chironi-Satta";
@@ -30,7 +30,7 @@ export async function analyzeCircularText(text: string, userClasses: string[] = 
       c.toUpperCase().includes("BS") || 
       c.toUpperCase().includes("IPSASR")
     );
-    schoolContext = "\n\n🏫 SCUOLA: IIS PIRA (Liceo Scientifico Siniscola)\n" +
+    schoolContext = "\n\n SCUOLA: IIS PIRA (Liceo Scientifico Siniscola)\n" +
                    `CLASSI RILEVANTI: ${relevantClasses.join(', ')}\n` +
                    "ISTRUZIONE: Estrai SOLO eventi per queste classi. Ignora tutte le altre.";
     schoolName = "IIS Pira";
@@ -57,8 +57,8 @@ STRUTTURA JSON OBBLIGATORIA:
   },
   "eventi": [
     {
-      "title": "string (TITOLO COMPLETO E CHIARO)",
-      "type": "string (CATEGORIA FISSA OBBLIGATORIA - vedi lista sotto)",
+      "title": "string",
+      "type": "string",
       "sede": "string",
       "data": "DD/MM/YYYY",
       "oraInizio": "HH:MM",
@@ -77,56 +77,51 @@ REGOLE FONDAMENTALI:
    - OdG = argomenti (NON eventi)
    - Eventi = riunioni con data/ora
 
-3. CAMPO "type" - CATEGORIE FISSE OBBLIGATORIE (REGOLA CRITICA):
-   ️ IL CAMPO "type" DEVE ESSERE ESATTAMENTE UNA DI QUESTE 6 CATEGORIE. NON INVENTARE ALTRE CATEGORIE!
+3. LETTURA TABELLE (REGOLA CRITICA - LEGGI ATTENTAMENTE):
    
-   ✅ CATEGORIE PERMESSE (usa SOLO queste):
-   - "Consigli di Classe" (per consigli di classe, riunioni di classe)
-   - "Collegio dei Docenti" (per collegi plenario, collegi docenti)
-   - "Collegio di Plesso" (per collegi di plesso separati per sede)
-   - "Dipartimenti" (per dipartimenti disciplinari, riunioni di dipartimento)
-   - "GLO" (per gruppi di lavoro operativi)
-   - "Colloqui" (per colloqui scuola-famiglia, ricevimenti)
+   Quando trovi una tabella con questo formato:
    
-   ❌ CATEGORIE VIETATE (NON usare mai):
-   - "Riunione" ← VIETATO! Usa "Consigli di Classe" o "Collegio dei Docenti"
-   - "Meeting" ← VIETATO!
-   - "Assemblea" ← VIETATO!
-   - "per area disciplinare" ← VIETATO! Usa "Dipartimenti"
-   - "plenario" ← VIETATO! Usa "Collegio dei Docenti"
+   | | 15.00/15.45 | 15.45/16.30 | 16.30/17.15 | 17.15/18.00 | 18.00/18.45 | 18.45/19.30 |
+   |---|---|---|---|---|---|---|
+   | Venerdì 24/10/2025 | 2 OR | 1 OR | 3 OR | 4 OR | 5A OR | 5B OR |
    
-   ESEMPI CORRETTI:
-   - Evento: "Consiglio di Classe 1AOR" → type: "Consigli di Classe"
-   - Evento: "Collegio dei Docenti plenario" → type: "Collegio dei Docenti"
-   - Evento: "Dipartimenti disciplinari" → type: "Dipartimenti"
-   - Evento: "Collegio di Plesso IPSASR" → type: "Collegio di Plesso"
+   PROCEDURA OBBLIGATORIA:
    
-   ⚠️ NON USARE MAI "Riunione" COME TYPE! Anche se il testo dice "riunione", il type deve essere la categoria corretta!
+   Passo 1: Identifica le intestazioni delle colonne (prima riga)
+   - Colonna 1: "15.00/15.45" → oraInizio: "15:00", oraFine: "15:45"
+   - Colonna 2: "15.45/16.30" → oraInizio: "15:45", oraFine: "16:30"
+   - Colonna 3: "16.30/17.15" → oraInizio: "16:30", oraFine: "17:15"
+   - Colonna 4: "17.15/18.00" → oraInizio: "17:15", oraFine: "18:00"
+   - Colonna 5: "18.00/18.45" → oraInizio: "18:00", oraFine: "18:45"
+   - Colonna 6: "18.45/19.30" → oraInizio: "18:45", oraFine: "19:30"
+   
+   Passo 2: Per ogni cella della tabella, associa l'orario della colonna alla classe
+   - Cella "2 OR" sotto colonna "15.00/15.45" → classe: "2AOR", orario: 15:00-15:45
+   - Cella "1 OR" sotto colonna "15.45/16.30" → classe: "1AOR", orario: 15:45-16:30
+   - Cella "3 OR" sotto colonna "16.30/17.15" → classe: "3AOR", orario: 16:30-17:15
+   - Cella "4 OR" sotto colonna "17.15/18.00" → classe: "4AOR", orario: 17:15-18:00
+   - Cella "5A OR" sotto colonna "18.00/18.45" → classe: "5AOR", orario: 18:00-18:45
+   - Cella "5B OR" sotto colonna "18.45/19.30" → classe: "5BOR", orario: 18:45-19:30
+   
+   ⚠️ NON ASSEGNARE LO STESSO ORARIO A TUTTE LE CLASSI! Ogni classe ha il suo orario specifico dalla colonna!
+   
+   Passo 3: La data viene dalla prima colonna della riga (es. "Venerdì 24/10/2025" → data: "24/10/2025")
 
-4. GESTIONE ORARI:
-   - Se la circolare specifica ENTRAMBI gli orari (inizio E fine), usali ESATTAMENTE
-   - Se specifica SOLO l'ora di inizio, aggiungi la durata standard:
-     * Collegio dei Docenti → +1h30m
-     * Consiglio di Classe → +1h30m
-     * Collegio di Plesso → +1h
-     * Dipartimenti → +1h
-     * GLO → +1h
-   - VERIFICA: oraFine deve essere 1-1.5 ore dopo oraInizio, NON 5-6 ore!
+4. CAMPO "type" - CATEGORIE FISSE:
+   - "Consigli di Classe"
+   - "Collegio dei Docenti"
+   - "Collegio di Plesso"
+   - "Dipartimenti"
+   - "GLO"
+   - "Colloqui"
+   
+   ❌ NON usare mai "Riunione"!
 
 5. CAMPO "title" - TITOLO COMPLETO:
-   - Titolo descrittivo completo con istituto se necessario
    - ✅ "Consiglio di Classe 1AOR"
    - ✅ "Dipartimenti disciplinari ITC Chironi-Satta"
-   - ❌ "1 OR" (troppo breve)
-   - ❌ "Riunione" (generico)
 
-6. LETTURA LISTE DI EVENTI:
-   - Quando vedi una lista con orari diversi, crea UN EVENTO PER OGNI RIGA
-
-7. FILTRO EVENTI DA ESCLUDERE:
-   - ESCLUDI eventi che contengono: "sostegno", "inclusione"
-
-8. NORMALIZZAZIONE CLASSI:
+6. NORMALIZZAZIONE CLASSI:
    - "1 OR" → "1AOR"
    - "2 OR" → "2AOR"
    - "3 OR" → "3AOR"
@@ -134,14 +129,14 @@ REGOLE FONDAMENTALI:
    - "5A OR" → "5AOR"
    - "5B OR" → "5BOR"
 
-9. ASSOCIAZIONE SEDI:
+7. ASSOCIAZIONE SEDI:
    - Classi OR → "Sede Orosei"
    - Classi AS/BS → "Sede Biscollai"
    - IPSASR → "Via Toscana"
 
-10. ${schoolContext}
+8. ${schoolContext}
 
-11. JSON valido, niente markdown.
+9. JSON valido, niente markdown.
 `
       },
       {
@@ -153,8 +148,8 @@ REGOLE FONDAMENTALI:
   });
 
   const content = response.choices[0]?.message?.content || "{}";
-  console.log("🤖 RAW AI JSON OUTPUT:", content);
-  console.log(" Scuola identificata:", isChironi ? "Chironi-Satta" : isPira ? "Pira" : "Sconosciuta");
+  console.log(" RAW AI JSON OUTPUT:", content);
+  console.log("🏫 Scuola identificata:", isChironi ? "Chironi-Satta" : isPira ? "Pira" : "Sconosciuta");
   console.log("📚 Classi rilevanti:", relevantClasses);
   
   try {
