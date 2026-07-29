@@ -1,7 +1,7 @@
 import { useState } from "react";
 
 type Event = {
-  id: string;
+  id?: string;
   title: string;
   type: string;
   date: string;
@@ -20,7 +20,7 @@ type VisualCalendarProps = {
 
 export default function VisualCalendar({ events, circularId, onEventUpdated }: VisualCalendarProps) {
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingEvent, setEditingEvent] = useState<Event | null>(null);
+  const [editingIndex, setEditingIndex] = useState<number | null>(null);
   
   const [formData, setFormData] = useState({
     title: "",
@@ -30,8 +30,8 @@ export default function VisualCalendar({ events, circularId, onEventUpdated }: V
     endTime: "",
   });
 
-  const handleEditClick = (event: Event) => {
-    setEditingEvent(event);
+  const handleEditClick = (event: Event, index: number) => {
+    setEditingIndex(index);
     setFormData({
       title: event.title,
       type: event.type,
@@ -43,11 +43,11 @@ export default function VisualCalendar({ events, circularId, onEventUpdated }: V
   };
 
   const handleSave = async () => {
-    if (!editingEvent || !circularId) return;
+    if (editingIndex === null || !circularId) return;
 
     try {
       const response = await fetch(
-        `https://school-agent-backend.onrender.com/api/circulars/${circularId}/events/${editingEvent.id}`,
+        `https://school-agent-backend.onrender.com/api/circulars/${circularId}/events/${editingIndex}`,
         {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
@@ -65,7 +65,7 @@ export default function VisualCalendar({ events, circularId, onEventUpdated }: V
       if (response.ok) {
         alert("✅ Evento aggiornato con successo!");
         setIsModalOpen(false);
-        setEditingEvent(null);
+        setEditingIndex(null);
         if (onEventUpdated) {
           onEventUpdated();
         }
@@ -83,7 +83,7 @@ export default function VisualCalendar({ events, circularId, onEventUpdated }: V
     <div className="space-y-3">
       {events.map((event, index) => (
         <div
-          key={event.id || index}
+          key={index}
           className="flex items-center justify-between p-4 bg-blue-50 border border-blue-200 rounded-lg hover:shadow-md transition-all"
         >
           <div className="flex-1">
@@ -100,12 +100,12 @@ export default function VisualCalendar({ events, circularId, onEventUpdated }: V
             </div>
             <div className="text-sm text-blue-700 flex items-center gap-4">
               <span>🕒 {event.startTime} - {event.endTime}</span>
-              <span>📍 {event.location || event.sede || "Sede non specificata"}</span>
+              <span> {event.location || event.sede || "Sede non specificata"}</span>
             </div>
           </div>
           
           <button
-            onClick={() => handleEditClick(event)}
+            onClick={() => handleEditClick(event, index)}
             className="ml-4 text-blue-600 hover:text-blue-800 hover:bg-blue-100 p-2 rounded-lg transition-colors"
             title="Modifica questo evento"
           >
@@ -115,7 +115,7 @@ export default function VisualCalendar({ events, circularId, onEventUpdated }: V
       ))}
 
       {/* MODALE DI MODIFICA */}
-      {isModalOpen && editingEvent && (
+      {isModalOpen && editingIndex !== null && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
           <div className="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl border border-gray-200">
             <h3 className="text-xl font-bold mb-4 text-gray-800 flex items-center gap-2">
@@ -188,10 +188,10 @@ export default function VisualCalendar({ events, circularId, onEventUpdated }: V
                 onClick={handleSave}
                 className="flex-1 bg-blue-600 text-white py-2.5 rounded-lg hover:bg-blue-700 font-semibold transition-colors"
               >
-                💾 Salva Modifiche
+                 Salva Modifiche
               </button>
               <button
-                onClick={() => { setIsModalOpen(false); setEditingEvent(null); }}
+                onClick={() => { setIsModalOpen(false); setEditingIndex(null); }}
                 className="flex-1 bg-gray-200 text-gray-700 py-2.5 rounded-lg hover:bg-gray-300 font-semibold transition-colors"
               >
                 Annulla

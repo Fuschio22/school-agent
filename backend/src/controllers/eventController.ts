@@ -5,10 +5,9 @@ const prisma = new PrismaClient();
 
 export const updateEvent = async (req: Request, res: Response) => {
   try {
-    const { circularId, eventId } = req.params;
+    const { circularId, eventIndex } = req.params;
     const { title, type, sede, data, oraInizio, oraFine, classe, location } = req.body;
 
-    // Trova la circolare
     const circular = await prisma.circular.findUnique({
       where: { id: circularId },
     });
@@ -17,13 +16,18 @@ export const updateEvent = async (req: Request, res: Response) => {
       return res.status(404).json({ error: "Circolare non trovata" });
     }
 
-    // Type assertion: diciamo a TypeScript che circular ha il campo events (che è un JSON field)
     const circularWithEvents = circular as any;
     const events = circularWithEvents.events || [];
 
-    // Aggiorna l'evento nell'array
-    const updatedEvents = events.map((event: any) => {
-      if (event.id === eventId) {
+    const index = parseInt(eventIndex, 10);
+
+    if (isNaN(index) || index < 0 || index >= events.length) {
+      return res.status(400).json({ error: "Indice evento non valido" });
+    }
+
+    // Aggiorna l'evento all'indice specificato
+    const updatedEvents = events.map((event: any, i: number) => {
+      if (i === index) {
         return {
           ...event,
           title: title || event.title,
@@ -39,7 +43,6 @@ export const updateEvent = async (req: Request, res: Response) => {
       return event;
     });
 
-    // Salva la circolare aggiornata
     const updatedCircular = await prisma.circular.update({
       where: { id: circularId },
       data: { events: updatedEvents },
