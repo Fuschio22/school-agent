@@ -20,7 +20,7 @@ export async function analyzeCircularText(text: string, userClasses: string[] = 
   
   if (isChironi && !isPira) {
     relevantClasses = userClasses.filter(c => c.toUpperCase().includes("OR"));
-    schoolContext = "\n\n🏫 SCUOLA: CHIRONI-SATTA (Nuoro)\n" +
+    schoolContext = "\n\n SCUOLA: CHIRONI-SATTA (Nuoro)\n" +
                    `CLASSI RILEVANTI: ${relevantClasses.join(', ')}\n` +
                    "ISTRUZIONE: Estrai SOLO eventi per queste classi OR. Ignora tutte le altre.";
     schoolName = "ITC Chironi-Satta";
@@ -57,8 +57,8 @@ STRUTTURA JSON OBBLIGATORIA:
   },
   "eventi": [
     {
-      "title": "string (TITOLO COMPLETO E CHIARO, non troncare!)",
-      "type": "string",
+      "title": "string (TITOLO COMPLETO E CHIARO)",
+      "type": "string (CATEGORIA FISSA - vedi lista sotto)",
       "sede": "string",
       "data": "DD/MM/YYYY",
       "oraInizio": "HH:MM",
@@ -77,40 +77,36 @@ REGOLE FONDAMENTALI:
    - OdG = argomenti (NON eventi)
    - Eventi = riunioni con data/ora
 
-3. TITOLI DEGLI EVENTI (REGOLA CRITICA):
-   - I titoli DEVONO essere COMPLETI e CHIARI, non frammenti!
-   - ❌ SBAGLIATO: "plenario", "per area disciplinare", "dipartimenti"
-   - ✅ CORRETTO: "Collegio dei Docenti plenario", "Dipartimenti disciplinari per area disciplinare", "Dipartimenti disciplinari"
+3. CAMPO "type" - CATEGORIE FISSE OBBLIGATORIE:
+   Il campo "type" DEVE essere UNA DI QUESTE CATEGORIE ESATTE (non inventare altre categorie!):
+   - "Consigli di Classe"
+   - "Collegio dei Docenti"
+   - "Collegio di Plesso"
+   - "Dipartimenti"
+   - "GLO"
+   - "Colloqui"
    
-   - Costruisci il titolo così:
-     * TIPO EVENTO + DETTAGLIO (se presente nel testo)
-     * Esempi:
-       - "Collegio dei Docenti plenario" (non solo "plenario")
-       - "Dipartimenti disciplinari per area disciplinare" (non solo "per area disciplinare")
-       - "Collegio dei Docenti di Plesso IPSASR" (non solo "IPSASR")
-       - "Consiglio di Classe 1AOR" (non solo "1AOR")
+   ❌ SBAGLIATO: "per area disciplinare", "plenario", "dipartimenti disciplinari"
+   ✅ CORRETTO: "Dipartimenti", "Collegio dei Docenti", "Collegio di Plesso"
    
-   - Se il testo dice "Collegio dei Docenti in seduta plenaria", il titolo deve essere "Collegio dei Docenti plenario"
-   - Se il testo dice "Dipartimenti disciplinari per area disciplinare", il titolo deve essere "Dipartimenti disciplinari per area disciplinare"
-   - NON troncare mai il titolo a una sola parola generica!
+   Il campo "type" serve per il badge colorato nel calendario. Deve essere UNA SOLA PAROLA CATEGORIA.
 
-4. LETTURA LISTE DI EVENTI:
-   - Quando vedi una lista con orari diversi, crea UN EVENTO PER OGNI RIGA:
-     "9.30 – 11.00 Dipartimento per l'inclusione (sostegno)"
-     "10.00 – 12.30 Dipartimenti disciplinari"
-     → Crea DUE eventi separati
+4. CAMPO "title" - TITOLO COMPLETO:
+   - Il titolo deve essere descrittivo e completo:
+     ✅ "Dipartimenti disciplinari ITC Chironi-Satta"
+     ✅ "Collegio dei Docenti plenario"
+     ✅ "Consiglio di Classe 1AOR"
+     ❌ "per area disciplinare" (troppo generico)
+     ❌ "plenario" (troncato)
 
-5. FILTRO EVENTI DA ESCLUDERE:
-   - ESCLUDI eventi che contengono: "sostegno", "inclusione" (a meno che non siano esplicitamente per le classi configurate)
+5. LETTURA LISTE DI EVENTI:
+   - Quando vedi una lista con orari diversi, crea UN EVENTO PER OGNI RIGA
 
-6. TITOLI EVENTI - AGGIUNGI ISTITUTO SE NECESSARIO:
-   - Se il titolo è troppo generico, aggiungi il nome dell'istituto:
-     * "Dipartimenti disciplinari" → "Dipartimenti disciplinari ITC Chironi-Satta"
+6. FILTRO EVENTI DA ESCLUDERE:
+   - ESCLUDI eventi che contengono: "sostegno", "inclusione"
 
-7. TIPOLOGIA EVENTI:
-   - "Collegio dei Docenti" → plenario
-   - "Collegio di Plesso" → separato per sede
-   - "Dipartimenti" → per area disciplinare
+7. TITOLI EVENTI - AGGIUNGI ISTITUTO SE NECESSARIO:
+   - Se il titolo è troppo generico, aggiungi il nome dell'istituto
 
 8. NORMALIZZAZIONE CLASSI:
    - "1 OR" → "1AOR"
@@ -136,7 +132,7 @@ REGOLE FONDAMENTALI:
 
   const content = response.choices[0]?.message?.content || "{}";
   console.log("🤖 RAW AI JSON OUTPUT:", content);
-  console.log("🏫 Scuola identificata:", isChironi ? "Chironi-Satta" : isPira ? "Pira" : "Sconosciuta");
+  console.log(" Scuola identificata:", isChironi ? "Chironi-Satta" : isPira ? "Pira" : "Sconosciuta");
   console.log("📚 Classi rilevanti:", relevantClasses);
   
   try {
