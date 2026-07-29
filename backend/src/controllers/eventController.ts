@@ -10,89 +10,50 @@ export const updateEvent = async (req: Request, res: Response) => {
 
     console.log("🔍 BACKEND - Ricevuta richiesta update:", { circularId, eventIndex });
 
-    const circular = await prisma.circular.findUnique({
-      where: { id: circularId },
+    const index = parseInt(eventIndex, 10);
+
+    // Trova tutti gli eventi per questa circolare, ordinati per createdAt
+    const events = await prisma.event.findMany({
+      where: { circularId },
+      orderBy: { createdAt: 'asc' },
     });
 
-    if (!circular) {
-      console.error("❌ BACKEND - Circolare non trovata:", circularId);
-      return res.status(404).json({ error: "Circolare non trovata" });
+    console.log("📦 BACKEND - Eventi trovati:", events.length);
+
+    if (events.length === 0) {
+      console.error("❌ BACKEND - Nessun evento trovato per questa circolare");
+      return res.status(404).json({ error: "Nessun evento trovato per questa circolare" });
     }
-
-    console.log("✅ BACKEND - Circolare trovata. ID:", circular.id);
-
-    const circularWithEvents = circular as any;
-    let events = circularWithEvents.events;
-
-    console.log(" BACKEND - Events grezzo dal DB:", events);
-    console.log("📦 BACKEND - Tipo di events:", typeof events);
-
-    if (!events) {
-      console.warn("️ BACKEND - Events è null/undefined, imposto array vuoto");
-      events = [];
-    } else if (typeof events === 'string') {
-      try {
-        console.log("📝 BACKEND - Events è una stringa, faccio il parse");
-        events = JSON.parse(events);
-      } catch (e) {
-        console.error("❌ BACKEND - Errore parsing JSON:", e);
-        events = [];
-      }
-    }
-
-    const index = parseInt(eventIndex, 10);
-    console.log("🔢 BACKEND - Index parsed:", index, "| Events length:", events.length);
 
     if (isNaN(index) || index < 0 || index >= events.length) {
-      console.error("❌ BACKEND - Indice non valido!");
-      console.error("Dettagli:", { 
-        index, 
-        eventsLength: events.length, 
-        eventIndex, 
-        eventsType: typeof events,
-        eventsContent: events 
-      });
-      
+      console.error("❌ BACKEND - Indice non valido:", { index, eventsLength: events.length });
       return res.status(400).json({ 
         error: "Indice evento non valido",
-        debug: { 
-          index, 
-          eventsLength: events.length, 
-          eventIndex, 
-          eventsType: typeof events,
-          eventsContent: events 
-        }
+        details: { index, eventsLength: events.length }
       });
     }
 
-    console.log("✏️ BACKEND - Aggiorno evento all'indice", index);
-    const updatedEvents = events.map((event: any, i: number) => {
-      if (i === index) {
-        return {
-          ...event,
-          title: title || event.title,
-          type: type || event.type,
-          sede: sede || event.sede,
-          data: data || event.data,
-          startTime: oraInizio || event.startTime,
-          endTime: oraFine || event.endTime,
-          classe: classe || event.classe,
-          location: location || event.location || sede,
-        };
-      }
-      return event;
-    });
+    // Prendi l'evento all'indice specificato
+    const eventToUpdate = events[index];
+    console.log("✏️ BACKEND - Aggiorno evento:", eventToUpdate.id);
 
-    console.log("💾 BACKEND - Salvataggio circolare aggiornata...");
-    const updatedCircular = await prisma.circular.update({
-      where: { id: circularId },
-      data: { events: updatedEvents },
+    // Aggiorna l'evento nella tabella Event
+    const updatedEvent = await prisma.event.update({
+      where: { id: eventToUpdate.id },
+      data: {
+        title: title || eventToUpdate.title,
+        type: type || eventToUpdate.type,
+        location: location || sede || eventToUpdate.location,
+        startTime: oraInizio || eventToUpdate.startTime,
+        endTime: oraFine || eventToUpdate.endTime,
+        date: data || eventToUpdate.date,
+      },
     });
 
     console.log("✅ BACKEND - Evento aggiornato con successo!");
-    res.json(updatedCircular);
+    res.json(updatedEvent);
   } catch (error) {
-    console.error("❌ BACKEND - Errore crash:", error);
+    console.error(" BACKEND - Errore crash:", error);
     const errorMessage = error instanceof Error ? error.message : String(error);
     res.status(500).json({ error: "Errore nell'aggiornamento evento", details: errorMessage });
   }
