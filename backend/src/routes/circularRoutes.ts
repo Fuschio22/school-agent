@@ -8,7 +8,6 @@ import {
   deleteCircularController
 } from "../controllers/circularController";
 
-// ✅ NUOVO: Importa il controller per aggiornare gli eventi
 import { updateEvent } from "../controllers/eventController";
 
 const router = Router();
@@ -34,16 +33,11 @@ const upload = multer({
   }
 });
 
-// Recupera tutte le circolari
 router.get("/", getAllCircularsController);
-
-// Analizza e salva una nuova circolare
 router.post("/analyze", upload.single('pdf'), analyzeCircularController);
-
-// ELIMINA una circolare specifica per ID
 router.delete("/:id", deleteCircularController);
 
-// ✅ NUOVO: Aggiorna un singolo evento all'interno di una circolare
-router.patch("/:circularId/events/:eventId", updateEvent);
+// ✅ CORRETTO: il parametro si chiama eventIndex, così il controller lo legge correttamente
+router.patch("/:circularId/events/:eventIndex", updateEvent);
 
 export default router;
