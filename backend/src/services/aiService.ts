@@ -16,23 +16,27 @@ export async function analyzeCircularText(text: string, userClasses: string[] = 
 
   let relevantClasses = userClasses;
   let schoolContext = "";
+  let schoolName = "";
   
   if (isChironi && !isPira) {
     relevantClasses = userClasses.filter(c => c.toUpperCase().includes("OR"));
-    schoolContext = "\n\n SCUOLA: CHIRONI-SATTA (Nuoro)\n" +
+    schoolContext = "\n\n🏫 SCUOLA: CHIRONI-SATTA (Nuoro)\n" +
                    `CLASSI RILEVANTI: ${relevantClasses.join(', ')}\n` +
                    "ISTRUZIONE: Estrai SOLO eventi per queste classi OR. Ignora tutte le altre.";
+    schoolName = "ITTC Chironi-Satta";
   } else if (isPira && !isChironi) {
     relevantClasses = userClasses.filter(c => 
       c.toUpperCase().includes("AS") || 
       c.toUpperCase().includes("BS") || 
       c.toUpperCase().includes("IPSASR")
     );
-    schoolContext = "\n\n SCUOLA: IIS PIRA (Liceo Scientifico Siniscola)\n" +
+    schoolContext = "\n\n🏫 SCUOLA: IIS PIRA (Liceo Scientifico Siniscola)\n" +
                    `CLASSI RILEVANTI: ${relevantClasses.join(', ')}\n` +
                    "ISTRUZIONE: Estrai SOLO eventi per queste classi. Ignora tutte le altre.";
+    schoolName = "IIS Pira";
   } else {
-    schoolContext = "\n\n️ SCUOLA NON IDENTIFICATA: estrai eventi per tutte le classi configurate.";
+    schoolContext = "\n\n⚠️ SCUOLA NON IDENTIFICATA: estrai eventi per tutte le classi configurate.";
+    schoolName = "Istituto";
   }
 
   const response = await openai.chat.completions.create({
@@ -72,46 +76,41 @@ REGOLE FONDAMENTALI:
 2. DISTINZIONE ODG/EVENTI:
    - OdG = argomenti (NON eventi)
    - Eventi = riunioni con data/ora
-   - 7 punti OdG ≠ 7 eventi!
 
 3. LETTURA TABELLE:
-   - Intestazione colonna = orario (es. "15.00/15.45")
+   - Intestazione colonna = orario
    - Cella = classe
    - Prima colonna = data
 
 4. TIPOLOGIA EVENTI - MANTIENI LA DISTINZIONE:
-   - "Collegio dei Docenti" → plenario (tutti i docenti)
-   - "Collegio di Plesso" → separato per sede/indirizzo
+   - "Collegio dei Docenti" → plenario
+   - "Collegio di Plesso" → separato per sede
    - "Dipartimenti" → per area disciplinare
-   - NON confonderli! Mantieni il tipo esatto dalla circolare.
 
-5. FILTRO COLLEGI DI PLESSO (CRITICO):
-   - Se l'evento è "Collegio di Plesso", includilo SOLO se riguarda:
-     a) "Liceo Scientifico di Siniscola" o "Liceo Scientifico Siniscola"
-     b) "IPSASR" o "Istituto Professionale per l'Agricoltura"
-   - ESCLUDI i collegi di plesso per altre scuole:
-     a) "Liceo Scientifico di Dorgali" → ESCLUDI
-     b) "ITTL" → ESCLUDI
-     c) Qualsiasi altra sede non Siniscola/IPSASR → ESCLUDI
-   - Esempio corretto:
-     * Testo: "Collegio di Plesso - IPSASR" → type: "Collegio di Plesso", title: "Collegio dei Docenti di Plesso IPSASR"
-     * Testo: "Collegio di Plesso - Liceo Scientifico Siniscola" → type: "Collegio di Plesso", title: "Collegio dei Docenti di Plesso Liceo Scientifico"
-     * Testo: "Collegio di Plesso - Dorgali" → ESCLUDI (non nelle classi configurate)
+5. TITOLI EVENTI - AGGIUNGI ISTITUTO QUANDO NON SPECIFICATO:
+   - Se il titolo è generico (es: "Dipartimenti disciplinari", "Collegio dei Docenti"), AGGIUNGI il nome dell'istituto:
+     * "Dipartimenti disciplinari" → "Dipartimenti disciplinari ${schoolName}"
+     * "Collegio dei Docenti" → "Collegio dei Docenti ${schoolName}"
+   - Se il titolo già specifica la scuola/indirizzo, mantienilo così com'è:
+     * "Collegio di Plesso IPSASR" → mantieni "Collegio dei Docenti di Plesso IPSASR"
+     * "Consiglio di Classe 1AOR" → mantieni "Consiglio di Classe 1AOR"
 
-6. NORMALIZZAZIONE CLASSI:
+6. FILTRO COLLEGI DI PLESSO:
+   - Includi SOLO se riguarda Liceo Scientifico Siniscola o IPSASR
+   - Escludi Dorgali, ITTL, altre sedi
+
+7. NORMALIZZAZIONE CLASSI:
    - "1 OR" → "1AOR"
    - "5A OR" → "5AOR"
-   - "1ASA" → "1AS"
-   - "2BSA" → "2BS"
 
-7. ASSOCIAZIONE SEDI:
+8. ASSOCIAZIONE SEDI:
    - Classi OR → "Sede Orosei"
    - Classi AS/BS → "Sede Biscollai"
-   - IPSASR/ETU/RIMS → "Via Toscana"
+   - IPSASR → "Via Toscana"
 
-8. ${schoolContext}
+9. ${schoolContext}
 
-9. JSON valido, niente markdown.
+10. JSON valido, niente markdown.
 `
       },
       {
