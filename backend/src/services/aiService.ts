@@ -31,62 +31,71 @@ STRUTTURA JSON OBBLIGATORIA:
   },
   "eventi": [
     {
-      "title": "string (es: 'Consiglio di Classe 1AOR', 'Convocazione Collegio plenario')",
-      "type": "string (es: 'Consigli di Classe', 'Collegio dei Docenti')",
-      "sede": "string (es: 'Sede Orosei', 'Sede Biscollai', 'Liceo Scientifico Siniscola')",
+      "title": "string (es: 'Consiglio di Classe 1AOR')",
+      "type": "string (es: 'Consigli di Classe')",
+      "sede": "string (es: 'Sede Orosei', 'Sede Biscollai')",
       "data": "DD/MM/YYYY",
       "oraInizio": "HH:MM",
       "oraFine": "HH:MM",
-      "classe": "string (es: '1AOR', 'Tutte' se evento generale)"
+      "classe": "string (es: '1AOR')"
     }
   ],
-  "ordineDelGiorno": ["array di stringhe (punti numerati)"]
+  "ordineDelGiorno": ["array di stringhe"]
 }
 
 REGOLE FONDAMENTALI (LEGGI ATTENTAMENTE):
 
 1. OGGETTO: È VIETATO lasciare vuoto. Cerca "OGGETTO:" o usa la prima frase significativa.
 
-2. DISTINZIONE CRITICA TRA ODG ED EVENTI (IMPORTANTE):
-   - L'Ordine del Giorno (Odg) è una LISTA DI ARGOMENTI da discutere, NON sono eventi calendario!
-   - Esempio: se l'Odg ha 7 punti, NON creare 7 eventi. Crea UN SOLO evento per la riunione.
-   - Gli eventi calendario sono SOLO le riunioni/convocazioni con data, ora inizio e ora fine.
-   - Se la circolare dice "Convocazione Collegio plenario il 1 settembre alle 10:30", crea UN evento:
-     * title: "Convocazione Collegio plenario"
-     * data: "01/09/2025"
-     * oraInizio: "10:30"
-     * oraFine: "12:00" (aggiungi 1h30m per Collegi)
-   - I punti dell'Odg vanno nell'array "ordineDelGiorno", NON nell'array "eventi"!
+2. DISTINZIONE CRITICA TRA ODG ED EVENTI:
+   - L'Ordine del Giorno (Odg) è una LISTA DI ARGOMENTI, NON sono eventi calendario!
+   - Se l'Odg ha 7 punti, NON creare 7 eventi. Crea UN SOLO evento per la riunione.
+   - I punti dell'Odg vanno nell'array "ordineDelGiorno", NON in "eventi"!
 
-3. ORDINE DEL GIORNO:
-   - Estrai TUTTI i punti numerati (1., 2., 3., ecc.) o elencati dopo "Odg:" o "per discutere".
-   - Mantieni il testo originale, non riassumere.
+3. LETTURA TABELLE (REGOLA CRITICA):
+   - Molte circolari hanno tabelle dove L'INTESTAZIONE DELLA COLONNA contiene l'orario.
+   - FORMATO TABELLA TIPICO:
+     | Intestazione colonna | 15.00/15.45 | 15.45/16.30 | 16.30/17.15 |
+     |----------------------|-------------|-------------|-------------|
+     | Martedì 21/10/2025   | 1ASA        | 2ASA        | 3ASA        |
+   
+   - COME LEGGERE:
+     * L'intestazione "15.00/15.45" significa: oraInizio=15:00, oraFine=15:45
+     * La cella "1ASA" sotto quella colonna significa: classe=1ASA, data=Martedì 21/10/2025
+     * Quindi l'evento è: classe 1ASA, data 21/10/2025, orario 15:00-15:45
+   
+   - PROCEDURA OBBLIGATORIA:
+     1. Identifica l'intestazione della prima colonna (di solito contiene le date)
+     2. Identifica le intestazioni delle altre colonne (contengono gli orari in formato "HH.MM/HH.MM")
+     3. Per OGNI cella della tabella:
+        - Prendi la data dalla prima colonna della stessa riga
+        - Prendi l'orario dall'intestazione della colonna
+        - Prendi la classe dal contenuto della cella
+     4. Crea UN evento per ogni cella non vuota
 
-4. ESTRAZIONE EVENTI DA TABELLE:
-   - ${classesInstruction}
-   - Per le tabelle: ogni riga = UN evento.
-   - NON confondere le righe della tabella con i punti dell'Odg!
-
-5. NORMALIZZAZIONE NOMI CLASSI:
+4. NORMALIZZAZIONE NOMI CLASSI:
    - "1 OR" → "1AOR" (aggiungi "A" prima di "OR")
    - "2 OR" → "2AOR"
    - "3 OR" → "3AOR"
    - "4 OR" → "4AOR"
    - "5A OR" → "5AOR" (rimuovi spazio)
    - "5B OR" → "5BOR" (rimuovi spazio)
+   - "1ASA" → "1AS" (rimuovi la "A" finale se presente)
+   - "2BSA" → "2BS" (rimuovi la "A" finale se presente)
 
-6. ASSOCIAZIONE SEDI (CRITICO):
-   - Se la classe contiene "OR" (es: 1AOR, 2AOR, 3AOR, 4AOR, 5AOR, 5BOR), la sede DEVE essere "Sede Orosei"
-   - Se la classe contiene "AS" o "BS" (es: 1AS, 2BS), la sede DEVE essere "Sede Biscollai"
-   - Se la classe contiene "ETU", "RIMS", "SIAS", "AFM", la sede DEVE essere "Via Toscana"
-   - NON associare automaticamente tutto a "Sede Biscollai" solo perché è menzionata nell'intestazione!
+5. ASSOCIAZIONE SEDI:
+   - Se la classe contiene "OR" → sede = "Sede Orosei"
+   - Se la classe contiene "AS" o "BS" → sede = "Sede Biscollai"
+   - Se la classe contiene "ETU", "RIMS", "SIAS", "AFM" → sede = "Via Toscana"
 
-7. GESTIONE ORARI:
-   - Se manca l'ora di fine, aggiungi 1h30m per Collegi dei Docenti o Consigli di Classe.
-   - Aggiungi 1h per Dipartimenti o GLO.
+6. GESTIONE ORARI:
+   - Se la tabella fornisce ENTRAMBI gli orari (es. "15.00/15.45"), usa quelli ESATTI.
+   - Se manca l'ora di fine, aggiungi 1h30m per Collegi/Consigli, 1h per Dipartimenti/GLO.
    - VERIFICA SEMPRE che oraInizio < oraFine.
 
-8. Restituisci SOLO JSON valido. Niente markdown (no \`\`\`json), niente testo extra. Inizia direttamente con { e termina con }.
+7. ${classesInstruction}
+
+8. Restituisci SOLO JSON valido. Niente markdown. Inizia con { e termina con }.
 `
       },
       {
@@ -98,7 +107,7 @@ REGOLE FONDAMENTALI (LEGGI ATTENTAMENTE):
   });
 
   const content = response.choices[0]?.message?.content || "{}";
-  console.log(" RAW AI JSON OUTPUT:", content);
+  console.log("🤖 RAW AI JSON OUTPUT:", content);
   
   try {
     return JSON.parse(content);
