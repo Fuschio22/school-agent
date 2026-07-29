@@ -19,7 +19,7 @@ export async function analyzeCircularText(text: string, userClasses: string[] = 
   
   if (isChironi && !isPira) {
     relevantClasses = userClasses.filter(c => c.toUpperCase().includes("OR"));
-    schoolContext = "\n\n🏫 SCUOLA: CHIRONI-SATTA (Nuoro)\n" +
+    schoolContext = "\n\n SCUOLA: CHIRONI-SATTA (Nuoro)\n" +
                    `CLASSI RILEVANTI: ${relevantClasses.join(', ')}\n` +
                    "ISTRUZIONE: Estrai SOLO eventi per queste classi OR. Ignora tutte le altre.";
   } else if (isPira && !isChironi) {
@@ -28,11 +28,11 @@ export async function analyzeCircularText(text: string, userClasses: string[] = 
       c.toUpperCase().includes("BS") || 
       c.toUpperCase().includes("IPSASR")
     );
-    schoolContext = "\n\n🏫 SCUOLA: IIS PIRA (Liceo Scientifico Siniscola)\n" +
+    schoolContext = "\n\n SCUOLA: IIS PIRA (Liceo Scientifico Siniscola)\n" +
                    `CLASSI RILEVANTI: ${relevantClasses.join(', ')}\n` +
                    "ISTRUZIONE: Estrai SOLO eventi per queste classi. Ignora tutte le altre.";
   } else {
-    schoolContext = "\n\n⚠️ SCUOLA NON IDENTIFICATA: estrai eventi per tutte le classi configurate.";
+    schoolContext = "\n\n️ SCUOLA NON IDENTIFICATA: estrai eventi per tutte le classi configurate.";
   }
 
   const response = await openai.chat.completions.create({
@@ -53,8 +53,8 @@ STRUTTURA JSON OBBLIGATORIA:
   },
   "eventi": [
     {
-      "title": "string",
-      "type": "string",
+      "title": "string (es: 'Collegio dei Docenti di Plesso - IPSASR')",
+      "type": "string (es: 'Collegio di Plesso', 'Collegio dei Docenti', 'Consigli di Classe')",
       "sede": "string",
       "data": "DD/MM/YYYY",
       "oraInizio": "HH:MM",
@@ -74,43 +74,44 @@ REGOLE FONDAMENTALI:
    - Eventi = riunioni con data/ora
    - 7 punti OdG ≠ 7 eventi!
 
-3. LETTURA TABELLE (REGOLA CRITICA):
-   
-   FORMATO TABELLA TIPICO:
-   | | 15.00/15.45 | 15.45/16.30 | 16.30/17.15 | 17.15/18.00 | 18.00/18.45 | 18.45/19.30 |
-   |---|---|---|---|---|---|---|
-   | Venerdì 24/10/2025 | 2 OR | 1 OR | 3 OR | 4 OR | 5A OR | 5B OR |
-   
-   PROCEDURA OBBLIGATORIA:
-   1. L'intestazione della PRIMA riga contiene gli orari (es. "15.00/15.45")
-   2. La PRIMA colonna contiene le date (es. "Venerdì 24/10/2025")
-   3. Per OGNI cella:
-      - Data = dalla prima colonna della stessa riga
-      - Orario = dall'intestazione della colonna (es. "15.00/15.45" → oraInizio: "15:00", oraFine: "15:45")
-      - Classe = dal contenuto della cella (es. "2 OR" → "2AOR")
-   
-   ⚠️ ATTENZIONE ALL'ORDINE:
-   - Leggi le colonne DA SINISTRA A DESTRA nell'ordine esatto in cui appaiono
-   - NON riordinare le classi! Mantieni l'ordine originale della tabella
-   - Esempio: se la tabella dice "15.00/15.45 = 2 OR", allora l'evento è 2AOR alle 15:00-15:45
-   - NON invertire mai classe e orario!
+3. LETTURA TABELLE:
+   - Intestazione colonna = orario (es. "15.00/15.45")
+   - Cella = classe
+   - Prima colonna = data
 
-4. NORMALIZZAZIONE CLASSI:
+4. TIPOLOGIA EVENTI - MANTIENI LA DISTINZIONE:
+   - "Collegio dei Docenti" → plenario (tutti i docenti)
+   - "Collegio di Plesso" → separato per sede/indirizzo
+   - "Dipartimenti" → per area disciplinare
+   - NON confonderli! Mantieni il tipo esatto dalla circolare.
+
+5. FILTRO COLLEGI DI PLESSO (CRITICO):
+   - Se l'evento è "Collegio di Plesso", includilo SOLO se riguarda:
+     a) "Liceo Scientifico di Siniscola" o "Liceo Scientifico Siniscola"
+     b) "IPSASR" o "Istituto Professionale per l'Agricoltura"
+   - ESCLUDI i collegi di plesso per altre scuole:
+     a) "Liceo Scientifico di Dorgali" → ESCLUDI
+     b) "ITTL" → ESCLUDI
+     c) Qualsiasi altra sede non Siniscola/IPSASR → ESCLUDI
+   - Esempio corretto:
+     * Testo: "Collegio di Plesso - IPSASR" → type: "Collegio di Plesso", title: "Collegio dei Docenti di Plesso IPSASR"
+     * Testo: "Collegio di Plesso - Liceo Scientifico Siniscola" → type: "Collegio di Plesso", title: "Collegio dei Docenti di Plesso Liceo Scientifico"
+     * Testo: "Collegio di Plesso - Dorgali" → ESCLUDI (non nelle classi configurate)
+
+6. NORMALIZZAZIONE CLASSI:
    - "1 OR" → "1AOR"
-   - "2 OR" → "2AOR"
-   - "3 OR" → "3AOR"
-   - "4 OR" → "4AOR"
    - "5A OR" → "5AOR"
-   - "5B OR" → "5BOR"
+   - "1ASA" → "1AS"
+   - "2BSA" → "2BS"
 
-5. ASSOCIAZIONE SEDI:
+7. ASSOCIAZIONE SEDI:
    - Classi OR → "Sede Orosei"
    - Classi AS/BS → "Sede Biscollai"
    - IPSASR/ETU/RIMS → "Via Toscana"
 
-6. ${schoolContext}
+8. ${schoolContext}
 
-7. JSON valido, niente markdown.
+9. JSON valido, niente markdown.
 `
       },
       {
