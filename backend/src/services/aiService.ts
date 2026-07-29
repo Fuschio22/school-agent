@@ -23,7 +23,7 @@ export async function analyzeCircularText(text: string, userClasses: string[] = 
     schoolContext = "\n\n🏫 SCUOLA: CHIRONI-SATTA (Nuoro)\n" +
                    `CLASSI RILEVANTI: ${relevantClasses.join(', ')}\n` +
                    "ISTRUZIONE: Estrai SOLO eventi per queste classi OR. Ignora tutte le altre.";
-    schoolName = "ITTC Chironi-Satta";
+    schoolName = "ITC Chironi-Satta";
   } else if (isPira && !isChironi) {
     relevantClasses = userClasses.filter(c => 
       c.toUpperCase().includes("AS") || 
@@ -57,8 +57,8 @@ STRUTTURA JSON OBBLIGATORIA:
   },
   "eventi": [
     {
-      "title": "string (es: 'Collegio dei Docenti di Plesso - IPSASR')",
-      "type": "string (es: 'Collegio di Plesso', 'Collegio dei Docenti', 'Consigli di Classe')",
+      "title": "string",
+      "type": "string",
       "sede": "string",
       "data": "DD/MM/YYYY",
       "oraInizio": "HH:MM",
@@ -77,27 +77,26 @@ REGOLE FONDAMENTALI:
    - OdG = argomenti (NON eventi)
    - Eventi = riunioni con data/ora
 
-3. LETTURA TABELLE:
-   - Intestazione colonna = orario
-   - Cella = classe
-   - Prima colonna = data
+3. LETTURA LISTE DI EVENTI (CRITICO):
+   - Quando vedi una lista con orari diversi, crea UN EVENTO PER OGNI RIGA:
+     Esempio:
+     "9.30 – 11.00 Dipartimento per l'inclusione (sostegno)"
+     "10.00 – 12.30 Dipartimenti disciplinari"
+     → Crea DUE eventi separati, NON unirli!
+   
+4. FILTRO EVENTI DA ESCLUDERE:
+   - ESCLUDI eventi che contengono: "sostegno", "inclusione", "GLO" (a meno che non siano esplicitamente per le classi configurate)
+   - Questi eventi sono per docenti di sostegno, non per tutti i docenti
 
-4. TIPOLOGIA EVENTI - MANTIENI LA DISTINZIONE:
+5. TITOLI EVENTI - AGGIUNGI ISTITUTO:
+   - Se il titolo è generico, aggiungi il nome dell'istituto:
+     * "Dipartimenti disciplinari" → "Dipartimenti disciplinari ITC Chironi-Satta"
+     * "Collegio dei Docenti" → "Collegio dei Docenti ITC Chironi-Satta"
+
+6. TIPOLOGIA EVENTI:
    - "Collegio dei Docenti" → plenario
    - "Collegio di Plesso" → separato per sede
    - "Dipartimenti" → per area disciplinare
-
-5. TITOLI EVENTI - AGGIUNGI ISTITUTO QUANDO NON SPECIFICATO:
-   - Se il titolo è generico (es: "Dipartimenti disciplinari", "Collegio dei Docenti"), AGGIUNGI il nome dell'istituto:
-     * "Dipartimenti disciplinari" → "Dipartimenti disciplinari ${schoolName}"
-     * "Collegio dei Docenti" → "Collegio dei Docenti ${schoolName}"
-   - Se il titolo già specifica la scuola/indirizzo, mantienilo così com'è:
-     * "Collegio di Plesso IPSASR" → mantieni "Collegio dei Docenti di Plesso IPSASR"
-     * "Consiglio di Classe 1AOR" → mantieni "Consiglio di Classe 1AOR"
-
-6. FILTRO COLLEGI DI PLESSO:
-   - Includi SOLO se riguarda Liceo Scientifico Siniscola o IPSASR
-   - Escludi Dorgali, ITTL, altre sedi
 
 7. NORMALIZZAZIONE CLASSI:
    - "1 OR" → "1AOR"
@@ -122,7 +121,7 @@ REGOLE FONDAMENTALI:
   });
 
   const content = response.choices[0]?.message?.content || "{}";
-  console.log("🤖 RAW AI JSON OUTPUT:", content);
+  console.log(" RAW AI JSON OUTPUT:", content);
   console.log("🏫 Scuola identificata:", isChironi ? "Chironi-Satta" : isPira ? "Pira" : "Sconosciuta");
   console.log("📚 Classi rilevanti:", relevantClasses);
   
