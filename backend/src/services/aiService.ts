@@ -20,7 +20,7 @@ export async function analyzeCircularText(text: string, userClasses: string[] = 
   
   if (isChironi && !isPira) {
     relevantClasses = userClasses.filter(c => c.toUpperCase().includes("OR"));
-    schoolContext = "\n\n SCUOLA: CHIRONI-SATTA (Nuoro)\n" +
+    schoolContext = "\n\n🏫 SCUOLA: CHIRONI-SATTA (Nuoro)\n" +
                    `CLASSI RILEVANTI: ${relevantClasses.join(', ')}\n` +
                    "ISTRUZIONE: Estrai SOLO eventi per queste classi OR. Ignora tutte le altre.";
     schoolName = "ITC Chironi-Satta";
@@ -30,7 +30,7 @@ export async function analyzeCircularText(text: string, userClasses: string[] = 
       c.toUpperCase().includes("BS") || 
       c.toUpperCase().includes("IPSASR")
     );
-    schoolContext = "\n\n SCUOLA: IIS PIRA (Liceo Scientifico Siniscola)\n" +
+    schoolContext = "\n\n🏫 SCUOLA: IIS PIRA (Liceo Scientifico Siniscola)\n" +
                    `CLASSI RILEVANTI: ${relevantClasses.join(', ')}\n` +
                    "ISTRUZIONE: Estrai SOLO eventi per queste classi. Ignora tutte le altre.";
     schoolName = "IIS Pira";
@@ -77,35 +77,41 @@ REGOLE FONDAMENTALI:
    - OdG = argomenti (NON eventi)
    - Eventi = riunioni con data/ora
 
-3. LETTURA TABELLE (REGOLA CRITICA - LEGGI ATTENTAMENTE):
+3. LETTURA TABELLE CON PIÙ COLONNE/SEDI (REGOLA CRITICA):
    
-   Quando trovi una tabella con questo formato:
+   Quando trovi una tabella con più colonne per sedi diverse (es: Biscollai, Orosei, V. Toscana):
    
-   | | 15.00/15.45 | 15.45/16.30 | 16.30/17.15 | 17.15/18.00 | 18.00/18.45 | 18.45/19.30 |
-   |---|---|---|---|---|---|---|
-   | Venerdì 24/10/2025 | 2 OR | 1 OR | 3 OR | 4 OR | 5A OR | 5B OR |
+   ESEMPIO DI TABELLA:
+   | Biscollai | Orosei | V. Toscana |
+   |-----------|--------|------------|
+   | 5E  14.45/15.15 | 5A OR  14.45/15.15 | 5SIA  15.00/15.30 |
+   | 4E  15.15/15.45 | 4 OR  15.15/15.45 | 4SIA  15.30/16.00 |
    
    PROCEDURA OBBLIGATORIA:
    
-   Passo 1: Identifica le intestazioni delle colonne (prima riga)
-   - Colonna 1: "15.00/15.45" → oraInizio: "15:00", oraFine: "15:45"
-   - Colonna 2: "15.45/16.30" → oraInizio: "15:45", oraFine: "16:30"
-   - Colonna 3: "16.30/17.15" → oraInizio: "16:30", oraFine: "17:15"
-   - Colonna 4: "17.15/18.00" → oraInizio: "17:15", oraFine: "18:00"
-   - Colonna 5: "18.00/18.45" → oraInizio: "18:00", oraFine: "18:45"
-   - Colonna 6: "18.45/19.30" → oraInizio: "18:45", oraFine: "19:30"
+   Passo 1: Identifica le tre colonne separate per sede
+   - Colonna 1: Biscollai (classi AS/BS/ETU)
+   - Colonna 2: Orosei (classi OR)
+   - Colonna 3: V. Toscana (classi IPSASR/SIA/MSB)
    
-   Passo 2: Per ogni cella della tabella, associa l'orario della colonna alla classe
-   - Cella "2 OR" sotto colonna "15.00/15.45" → classe: "2AOR", orario: 15:00-15:45
-   - Cella "1 OR" sotto colonna "15.45/16.30" → classe: "1AOR", orario: 15:45-16:30
-   - Cella "3 OR" sotto colonna "16.30/17.15" → classe: "3AOR", orario: 16:30-17:15
-   - Cella "4 OR" sotto colonna "17.15/18.00" → classe: "4AOR", orario: 17:15-18:00
-   - Cella "5A OR" sotto colonna "18.00/18.45" → classe: "5AOR", orario: 18:00-18:45
-   - Cella "5B OR" sotto colonna "18.45/19.30" → classe: "5BOR", orario: 18:45-19:30
+   Passo 2: Per OGNI riga, estrai TUTTE le celle da tutte le colonne
+   - NON saltare nessuna cella!
+   - NON sovrapporre le classi tra colonne diverse!
+   - Ogni colonna è indipendente dalle altre
    
-   ⚠️ NON ASSEGNARE LO STESSO ORARIO A TUTTE LE CLASSI! Ogni classe ha il suo orario specifico dalla colonna!
+   Passo 3: Per ogni cella, estrai:
+   - Classe: il testo a sinistra (es: "5A OR", "1 OR", "4 OR")
+   - Orario: il testo a destra (es: "14.45/15.15", "17.00/17.45")
    
-   Passo 3: La data viene dalla prima colonna della riga (es. "Venerdì 24/10/2025" → data: "24/10/2025")
+   Passo 4: Gli orari vanno usati ESATTAMENTE come scritti, NON inventarli!
+   - Se la tabella dice "1 OR  17.00/17.45" → oraInizio: "17:00", oraFine: "17:45"
+   - Se la tabella dice "5A OR  14.45/15.15" → oraInizio: "14:45", oraFine: "15:15"
+   - NON calcolare orari basandoti sulle classi precedenti!
+   
+   ⚠️ ATTENZIONE:
+   - Ogni riga può contenere FINO A 3 eventi diversi (uno per colonna)
+   - NON sovrapporre gli orari tra colonne diverse
+   - LEGGI TUTTE le celle, anche quelle evidenziate in rosso!
 
 4. CAMPO "type" - CATEGORIE FISSE:
    - "Consigli di Classe"
@@ -114,8 +120,6 @@ REGOLE FONDAMENTALI:
    - "Dipartimenti"
    - "GLO"
    - "Colloqui"
-   
-   ❌ NON usare mai "Riunione"!
 
 5. CAMPO "title" - TITOLO COMPLETO:
    - ✅ "Consiglio di Classe 1AOR"
@@ -132,7 +136,7 @@ REGOLE FONDAMENTALI:
 7. ASSOCIAZIONE SEDI:
    - Classi OR → "Sede Orosei"
    - Classi AS/BS → "Sede Biscollai"
-   - IPSASR → "Via Toscana"
+   - IPSASR/SIA/MSB → "Via Toscana"
 
 8. ${schoolContext}
 
@@ -148,7 +152,7 @@ REGOLE FONDAMENTALI:
   });
 
   const content = response.choices[0]?.message?.content || "{}";
-  console.log(" RAW AI JSON OUTPUT:", content);
+  console.log("🤖 RAW AI JSON OUTPUT:", content);
   console.log("🏫 Scuola identificata:", isChironi ? "Chironi-Satta" : isPira ? "Pira" : "Sconosciuta");
   console.log("📚 Classi rilevanti:", relevantClasses);
   
