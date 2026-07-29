@@ -30,10 +30,14 @@ export default function VisualCalendar({ events, circularId, onEventUpdated }: V
     endTime: "",
   });
 
-  console.log("📊 VisualCalendar props:", { events, circularId, eventsCount: events.length });
+  // ✅ ORDINAMENTO CRESCENTE per orario di inizio
+  const sortedEvents = [...events].sort((a, b) => {
+    if (a.startTime < b.startTime) return -1;
+    if (a.startTime > b.startTime) return 1;
+    return 0;
+  });
 
   const handleEditClick = (event: Event, index: number) => {
-    console.log("️ Click su Modifica - Index:", index, "Event:", event);
     setEditingIndex(index);
     setFormData({
       title: event.title,
@@ -46,38 +50,27 @@ export default function VisualCalendar({ events, circularId, onEventUpdated }: V
   };
 
   const handleSave = async () => {
-    console.log("💾 Tentativo di salvataggio - Index:", editingIndex, "CircularId:", circularId);
-    
     if (editingIndex < 0 || !circularId) {
-      console.error("❌ Parametri invalidi:", { editingIndex, circularId });
-      alert(`❌ Errore: Indice=${editingIndex}, CircularId=${circularId}`);
+      alert("❌ Errore: parametri non validi");
       return;
     }
 
     try {
-      const url = `https://school-agent-backend.onrender.com/api/circulars/${circularId}/events/${editingIndex}`;
-      console.log("🌐 Chiamata API:", url);
-      
-      const body = {
-        title: formData.title,
-        type: formData.type,
-        sede: formData.sede,
-        location: formData.sede,
-        oraInizio: formData.startTime,
-        oraFine: formData.endTime,
-      };
-      
-      console.log("📦 Body:", body);
-
-      const response = await fetch(url, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
-
-      console.log("📥 Response status:", response.status);
-      const responseData = await response.json();
-      console.log("📥 Response data:", responseData);
+      const response = await fetch(
+        `https://school-agent-backend.onrender.com/api/circulars/${circularId}/events/${editingIndex}`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            title: formData.title,
+            type: formData.type,
+            sede: formData.sede,
+            location: formData.sede,
+            oraInizio: formData.startTime,
+            oraFine: formData.endTime,
+          }),
+        }
+      );
 
       if (response.ok) {
         alert("✅ Evento aggiornato con successo!");
@@ -87,19 +80,20 @@ export default function VisualCalendar({ events, circularId, onEventUpdated }: V
           onEventUpdated();
         }
       } else {
-        alert(`❌ Errore: ${responseData.error || "Impossibile aggiornare l'evento"}`);
+        const err = await response.json();
+        alert(`❌ Errore: ${err.error || "Impossibile aggiornare l'evento"}`);
       }
     } catch (error) {
-      console.error("❌ Errore di rete:", error);
+      console.error("Errore di rete:", error);
       alert("❌ Errore di connessione al server");
     }
   };
 
   return (
     <div className="space-y-3">
-      {events.map((event, index) => (
+      {sortedEvents.map((event, index) => (
         <div
-          key={index}
+          key={event.id || index}
           className="flex items-center justify-between p-4 bg-blue-50 border border-blue-200 rounded-lg hover:shadow-md transition-all"
         >
           <div className="flex-1">
@@ -121,14 +115,11 @@ export default function VisualCalendar({ events, circularId, onEventUpdated }: V
           </div>
           
           <button
-            onClick={() => {
-              console.log(" Button clicked for index:", index);
-              handleEditClick(event, index);
-            }}
+            onClick={() => handleEditClick(event, index)}
             className="ml-4 text-blue-600 hover:text-blue-800 hover:bg-blue-100 p-2 rounded-lg transition-colors"
             title="Modifica questo evento"
           >
-            ✏️ Modifica
+            ️ Modifica
           </button>
         </div>
       ))}
