@@ -6,12 +6,39 @@ export async function analyzeCircularText(text: string, userClasses: string[] = 
     baseURL: "https://api.groq.com/openai/v1", 
   });
 
-  const classesInstruction = userClasses.length > 0
-    ? `\n\n🎯 CLASSI DI INTERESSE DELL'UTENTE: ${userClasses.join(', ')}\n` +
-      `ISTRUZIONE CRITICA DI FILTRO: Estrai SOLO gli eventi relativi a queste classi specifiche. ` +
-      `IGNORA completamente qualsiasi altra classe menzionata nel testo. ` +
-      `ECCEZIONE OBBLIGATORIA: Se l'evento è GENERALE (es. "Collegio dei Docenti", "Formazione"), includilo SEMPRE impostando "classe": "Tutte".`
-    : `\n\n⚠️ Nessuna classe specifica indicata: estrai tutti gli eventi presenti.`;
+  // ✅ Identifica la scuola dalla circolare
+  const isChironi = text.toUpperCase().includes("CHIRONI") || 
+                    text.toUpperCase().includes("NUTD110002") ||
+                    text.toUpperCase().includes("NUORO");
+  
+  const isPira = text.toUpperCase().includes("PIRA") || 
+                 text.toUpperCase().includes("SINISCOLA") ||
+                 text.toUpperCase().includes("LICEO SCIENTIFICO");
+
+  // ✅ Seleziona le classi corrette in base alla scuola
+  let relevantClasses = userClasses;
+  let schoolContext = "";
+  
+  if (isChironi && !isPira) {
+    // Circolare del Chironi-Satta → filtra SOLO classi OR
+    relevantClasses = userClasses.filter(c => c.toUpperCase().includes("OR"));
+    schoolContext = "\n\n🏫 SCUOLA: CHIRONI-SATTA (Nuoro)\n" +
+                   `CLASSI RILEVANTI: ${relevantClasses.join(', ')}\n` +
+                   "ISTRUZIONE: Estrai SOLO eventi per queste classi OR. Ignora tutte le altre.";
+  } else if (isPira && !isChironi) {
+    // Circolare del Pira → filtra SOLO classi AS/BS/IPSASR
+    relevantClasses = userClasses.filter(c => 
+      c.toUpperCase().includes("AS") || 
+      c.toUpperCase().includes("BS") || 
+      c.toUpperCase().includes("IPSASR")
+    );
+    schoolContext = "\n\n🏫 SCUOLA: IIS PIRA (Liceo Scientifico Siniscola)\n" +
+                   `CLASSI RILEVANTI: ${relevantClasses.join(', ')}\n` +
+                   "ISTRUZIONE: Estrai SOLO eventi per queste classi. Ignora tutte le altre.";
+  } else {
+    // Scuola non identificata → usa tutte le classi
+    schoolContext = "\n\n⚠️ SCUOLA NON IDENTIFICATA: estrai eventi per tutte le classi configurate.";
+  }
 
   const response = await openai.chat.completions.create({
     model: "llama-3.3-70b-versatile",
@@ -24,78 +51,53 @@ Il tuo compito è estrarre i dati da una circolare testuale e restituire UN SOLO
 STRUTTURA JSON OBBLIGATORIA:
 {
   "circolare": {
-    "numero": "string (es: '52', 'N/D' se non presente)",
-    "data": "string (es: '13/10/2025')",
-    "oggetto": "string (NON lasciare mai vuoto!)",
-    "destinatari": ["array di stringhe"]
+    "numero": "string",
+    "data": "string",
+    "oggetto": "string (NON vuoto!)",
+    "destinatari": ["array"]
   },
   "eventi": [
     {
-      "title": "string (es: 'Consiglio di Classe 1AOR')",
-      "type": "string (es: 'Consigli di Classe')",
-      "sede": "string (es: 'Sede Orosei', 'Sede Biscollai')",
+      "title": "string",
+      "type": "string",
+      "sede": "string",
       "data": "DD/MM/YYYY",
       "oraInizio": "HH:MM",
       "oraFine": "HH:MM",
-      "classe": "string (es: '1AOR')"
+      "classe": "string"
     }
   ],
-  "ordineDelGiorno": ["array di stringhe"]
+  "ordineDelGiorno": ["array"]
 }
 
-REGOLE FONDAMENTALI (LEGGI ATTENTAMENTE):
+REGOLE FONDAMENTALI:
 
-1. OGGETTO: È VIETATO lasciare vuoto. Cerca "OGGETTO:" o usa la prima frase significativa.
+1. OGGETTO: Mai vuoto.
 
-2. DISTINZIONE CRITICA TRA ODG ED EVENTI:
-   - L'Ordine del Giorno (Odg) è una LISTA DI ARGOMENTI, NON sono eventi calendario!
-   - Se l'Odg ha 7 punti, NON creare 7 eventi. Crea UN SOLO evento per la riunione.
-   - I punti dell'Odg vanno nell'array "ordineDelGiorno", NON in "eventi"!
+2. DISTINZIONE ODG/EVENTI:
+   - OdG = argomenti (NON eventi)
+   - Eventi = riunioni con data/ora
+   - 7 punti OdG ≠ 7 eventi!
 
-3. LETTURA TABELLE (REGOLA CRITICA):
-   - Molte circolari hanno tabelle dove L'INTESTAZIONE DELLA COLONNA contiene l'orario.
-   - FORMATO TABELLA TIPICO:
-     | Intestazione colonna | 15.00/15.45 | 15.45/16.30 | 16.30/17.15 |
-     |----------------------|-------------|-------------|-------------|
-     | Martedì 21/10/2025   | 1ASA        | 2ASA        | 3ASA        |
-   
-   - COME LEGGERE:
-     * L'intestazione "15.00/15.45" significa: oraInizio=15:00, oraFine=15:45
-     * La cella "1ASA" sotto quella colonna significa: classe=1ASA, data=Martedì 21/10/2025
-     * Quindi l'evento è: classe 1ASA, data 21/10/2025, orario 15:00-15:45
-   
-   - PROCEDURA OBBLIGATORIA:
-     1. Identifica l'intestazione della prima colonna (di solito contiene le date)
-     2. Identifica le intestazioni delle altre colonne (contengono gli orari in formato "HH.MM/HH.MM")
-     3. Per OGNI cella della tabella:
-        - Prendi la data dalla prima colonna della stessa riga
-        - Prendi l'orario dall'intestazione della colonna
-        - Prendi la classe dal contenuto della cella
-     4. Crea UN evento per ogni cella non vuota
+3. LETTURA TABELLE:
+   - Intestazione colonna = orario (es. "15.00/15.45")
+   - Cella = classe
+   - Prima colonna = data
 
-4. NORMALIZZAZIONE NOMI CLASSI:
-   - "1 OR" → "1AOR" (aggiungi "A" prima di "OR")
-   - "2 OR" → "2AOR"
-   - "3 OR" → "3AOR"
-   - "4 OR" → "4AOR"
-   - "5A OR" → "5AOR" (rimuovi spazio)
-   - "5B OR" → "5BOR" (rimuovi spazio)
-   - "1ASA" → "1AS" (rimuovi la "A" finale se presente)
-   - "2BSA" → "2BS" (rimuovi la "A" finale se presente)
+4. NORMALIZZAZIONE CLASSI:
+   - "1 OR" → "1AOR"
+   - "5A OR" → "5AOR"
+   - "1ASA" → "1AS"
+   - "2BSA" → "2BS"
 
 5. ASSOCIAZIONE SEDI:
-   - Se la classe contiene "OR" → sede = "Sede Orosei"
-   - Se la classe contiene "AS" o "BS" → sede = "Sede Biscollai"
-   - Se la classe contiene "ETU", "RIMS", "SIAS", "AFM" → sede = "Via Toscana"
+   - Classi OR → "Sede Orosei"
+   - Classi AS/BS → "Sede Biscollai"
+   - IPSASR/ETU/RIMS → "Via Toscana"
 
-6. GESTIONE ORARI:
-   - Se la tabella fornisce ENTRAMBI gli orari (es. "15.00/15.45"), usa quelli ESATTI.
-   - Se manca l'ora di fine, aggiungi 1h30m per Collegi/Consigli, 1h per Dipartimenti/GLO.
-   - VERIFICA SEMPRE che oraInizio < oraFine.
+6. ${schoolContext}
 
-7. ${classesInstruction}
-
-8. Restituisci SOLO JSON valido. Niente markdown. Inizia con { e termina con }.
+7. JSON valido, niente markdown.
 `
       },
       {
@@ -107,14 +109,16 @@ REGOLE FONDAMENTALI (LEGGI ATTENTAMENTE):
   });
 
   const content = response.choices[0]?.message?.content || "{}";
-  console.log("🤖 RAW AI JSON OUTPUT:", content);
+  console.log(" RAW AI JSON OUTPUT:", content);
+  console.log("🏫 Scuola identificata:", isChironi ? "Chironi-Satta" : isPira ? "Pira" : "Sconosciuta");
+  console.log("📚 Classi rilevanti:", relevantClasses);
   
   try {
     return JSON.parse(content);
   } catch (error) {
-    console.error("❌ Errore nel parsing del JSON AI:", error);
+    console.error("❌ Errore parsing JSON:", error);
     return {
-      circolare: { numero: "N/D", data: "N/D", oggetto: "Errore parsing AI", destinatari: [] },
+      circolare: { numero: "N/D", data: "N/D", oggetto: "Errore", destinatari: [] },
       eventi: [],
       ordineDelGiorno: []
     };
