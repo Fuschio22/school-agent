@@ -6,12 +6,11 @@ export async function analyzeCircularText(text: string, userClasses: string[] = 
     baseURL: "https://api.groq.com/openai/v1", 
   });
 
-  // ✅ Istruzione dinamica basata sulle classi dell'utente
   const classesInstruction = userClasses.length > 0
     ? `\n\n🎯 CLASSI DI INTERESSE DELL'UTENTE: ${userClasses.join(', ')}\n` +
       `ISTRUZIONE CRITICA DI FILTRO: Estrai SOLO gli eventi relativi a queste classi specifiche. ` +
-      `IGNORA completamente qualsiasi altra classe menzionata nel testo (es. 1ASA, 3RIMS, ecc.). ` +
-      `ECCEZIONE OBBLIGATORIA: Se l'evento è GENERALE (es. "Collegio dei Docenti", "Formazione", "Scrutini finali", "Riunione di Dipartimento", "Collegio plenario"), includilo SEMPRE impostando il campo "classe" come "Tutte".`
+      `IGNORA completamente qualsiasi altra classe menzionata nel testo. ` +
+      `ECCEZIONE OBBLIGATORIA: Se l'evento è GENERALE (es. "Collegio dei Docenti", "Formazione"), includilo SEMPRE impostando "classe": "Tutte".`
     : `\n\n⚠️ Nessuna classe specifica indicata: estrai tutti gli eventi presenti.`;
 
   const response = await openai.chat.completions.create({
@@ -25,56 +24,69 @@ Il tuo compito è estrarre i dati da una circolare testuale e restituire UN SOLO
 STRUTTURA JSON OBBLIGATORIA:
 {
   "circolare": {
-    "numero": "string (es: '52', '12/A', o 'N/D' se non presente)",
+    "numero": "string (es: '52', 'N/D' se non presente)",
     "data": "string (es: '13/10/2025')",
-    "oggetto": "string (Estrai il testo che segue 'OGGETTO:' o riassumi il tema. NON lasciare mai vuoto!)",
+    "oggetto": "string (NON lasciare mai vuoto!)",
     "destinatari": ["array di stringhe"]
   },
   "eventi": [
     {
       "title": "string (es: 'Consiglio di Classe 1AOR', 'Convocazione Collegio plenario')",
-      "type": "string (es: 'Consigli di Classe', 'Collegio dei Docenti', 'GLO', 'Dipartimenti', 'Scrutini', 'Colloqui')",
-      "sede": "string (es: 'Sede Biscollai', 'Auditorium')",
+      "type": "string (es: 'Consigli di Classe', 'Collegio dei Docenti')",
+      "sede": "string (es: 'Sede Orosei', 'Sede Biscollai', 'Liceo Scientifico Siniscola')",
       "data": "DD/MM/YYYY",
       "oraInizio": "HH:MM",
       "oraFine": "HH:MM",
       "classe": "string (es: '1AOR', 'Tutte' se evento generale)"
     }
   ],
-  "ordineDelGiorno": ["array di stringhe (punti numerati o elencati)"]
+  "ordineDelGiorno": ["array di stringhe (punti numerati)"]
 }
 
-REGOLE FONDAMENTALI PER L'ESTRAZIONE:
+REGOLE FONDAMENTALI (LEGGI ATTENTAMENTE):
 
-1. OGGETTO: È VIETATO lasciare questo campo vuoto. Cerca "OGGETTO:" o usa la prima frase significativa.
+1. OGGETTO: È VIETATO lasciare vuoto. Cerca "OGGETTO:" o usa la prima frase significativa.
 
-2. ORDINE DEL GIORNO (CRITICO):
-   - Cerca sezioni con frasi come "per discutere il seguente Odg:", "Ordine del Giorno", "Odg:".
-   - Estrai TUTTI i punti numerati (1., 2., 3., ecc.) o elencati immediatamente dopo.
-   - Mantieni il testo originale dei punti, non riassumerli.
-   - Se non trovi un OdG esplicito, lascia l'array vuoto [].
+2. DISTINZIONE CRITICA TRA ODG ED EVENTI (IMPORTANTE):
+   - L'Ordine del Giorno (Odg) è una LISTA DI ARGOMENTI da discutere, NON sono eventi calendario!
+   - Esempio: se l'Odg ha 7 punti, NON creare 7 eventi. Crea UN SOLO evento per la riunione.
+   - Gli eventi calendario sono SOLO le riunioni/convocazioni con data, ora inizio e ora fine.
+   - Se la circolare dice "Convocazione Collegio plenario il 1 settembre alle 10:30", crea UN evento:
+     * title: "Convocazione Collegio plenario"
+     * data: "01/09/2025"
+     * oraInizio: "10:30"
+     * oraFine: "12:00" (aggiungi 1h30m per Collegi)
+   - I punti dell'Odg vanno nell'array "ordineDelGiorno", NON nell'array "eventi"!
 
-3. ESTRAZIONE EVENTI (TESTO O TABELLA):
-   - NON cercare solo nelle tabelle! Leggi tutto il testo discorsivo.
-   - Se trovi frasi come "convocata per il giorno X alle ore Y", crea un evento.
+3. ORDINE DEL GIORNO:
+   - Estrai TUTTI i punti numerati (1., 2., 3., ecc.) o elencati dopo "Odg:" o "per discutere".
+   - Mantieni il testo originale, non riassumere.
+
+4. ESTRAZIONE EVENTI DA TABELLE:
    - ${classesInstruction}
+   - Per le tabelle: ogni riga = UN evento.
+   - NON confondere le righe della tabella con i punti dell'Odg!
 
-4. NORMALIZZAZIONE NOMI CLASSI (CRITICO):
-   - Se trovi classi scritte come "1 OR", "2 OR", "3 OR", "4 OR" (senza la lettera prima di OR), NORMALIZZALE aggiungendo la "A":
-     → "1 OR" diventa "1AOR"
-     → "2 OR" diventa "2AOR"
-     → "3 OR" diventa "3AOR"
-     → "4 OR" diventa "4AOR"
-   - Se trovi "5A OR" o "5B OR", normalizzale come "5AOR" e "5BOR" (senza spazio).
-   - Mantieni invariati i nomi delle altre classi (es. "1AS", "2BS", "4A IPSASR").
+5. NORMALIZZAZIONE NOMI CLASSI:
+   - "1 OR" → "1AOR" (aggiungi "A" prima di "OR")
+   - "2 OR" → "2AOR"
+   - "3 OR" → "3AOR"
+   - "4 OR" → "4AOR"
+   - "5A OR" → "5AOR" (rimuovi spazio)
+   - "5B OR" → "5BOR" (rimuovi spazio)
 
-5. GESTIONE ORARI:
-   - Se nel testo c'è SOLO l'ora di inizio (es. "h. 10.30") e manca l'ora di fine:
-     → AGGIUNGI 1 ora e 30 minuti per Collegi dei Docenti o Consigli di Classe.
-     → AGGIUNGI 1 ora per Dipartimenti o GLO.
+6. ASSOCIAZIONE SEDI (CRITICO):
+   - Se la classe contiene "OR" (es: 1AOR, 2AOR, 3AOR, 4AOR, 5AOR, 5BOR), la sede DEVE essere "Sede Orosei"
+   - Se la classe contiene "AS" o "BS" (es: 1AS, 2BS), la sede DEVE essere "Sede Biscollai"
+   - Se la classe contiene "ETU", "RIMS", "SIAS", "AFM", la sede DEVE essere "Via Toscana"
+   - NON associare automaticamente tutto a "Sede Biscollai" solo perché è menzionata nell'intestazione!
+
+7. GESTIONE ORARI:
+   - Se manca l'ora di fine, aggiungi 1h30m per Collegi dei Docenti o Consigli di Classe.
+   - Aggiungi 1h per Dipartimenti o GLO.
    - VERIFICA SEMPRE che oraInizio < oraFine.
 
-6. Restituisci SOLO JSON valido. Niente markdown (no \`\`\`json), niente testo extra. Inizia direttamente con { e termina con }.
+8. Restituisci SOLO JSON valido. Niente markdown (no \`\`\`json), niente testo extra. Inizia direttamente con { e termina con }.
 `
       },
       {
@@ -86,7 +98,7 @@ REGOLE FONDAMENTALI PER L'ESTRAZIONE:
   });
 
   const content = response.choices[0]?.message?.content || "{}";
-  console.log("🤖 RAW AI JSON OUTPUT:", content);
+  console.log(" RAW AI JSON OUTPUT:", content);
   
   try {
     return JSON.parse(content);
