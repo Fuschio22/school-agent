@@ -18,18 +18,62 @@ interface SavedCircular {
 // ✅ Helper: dato "2025/2026" restituisce date di inizio e fine anno scolastico
 const getSchoolYearRange = (schoolYear: string) => {
   const [startYear] = schoolYear.split("/").map(Number);
-  const startDate = new Date(startYear, 7, 1); // ✅ 1° Agosto (mese 7) per includere le circolari di fine estate
+  const startDate = new Date(startYear, 7, 1); // 1° Agosto
   const endDate = new Date(startYear + 1, 6, 31); // 31 Luglio
   return { startDate, endDate };
+};
+
+// ✅ NUOVO: Parser intelligente per date italiane (gestisce sia "13/10/2025" che "13 ottobre 2025")
+const parseItalianDate = (dateStr: string): Date | null => {
+  if (!dateStr) return null;
+  
+  // 1. Formato DD/MM/YYYY
+  if (dateStr.includes("/")) {
+    const [day, month, year] = dateStr.split("/").map(Number);
+    if (!isNaN(day) && !isNaN(month) && !isNaN(year)) {
+      return new Date(year, month - 1, day);
+    }
+  }
+  
+  // 2. Formato testuale (es. "13 ottobre 2025", "22 gennaio 2026")
+  const months: Record<string, number> = {
+    gennaio: 0, febbraio: 1, marzo: 2, aprile: 3, maggio: 4, giugno: 5,
+    luglio: 6, agosto: 7, settembre: 8, ottobre: 9, novembre: 10, dicembre: 11
+  };
+  
+  const lowerStr = dateStr.toLowerCase();
+  const yearMatch = dateStr.match(/\b(20\d{2})\b/);
+  
+  for (const [monthName, monthIndex] of Object.entries(months)) {
+    if (lowerStr.includes(monthName)) {
+      const dayMatch = dateStr.match(/(\d{1,2})/); // Prende il primo numero (il giorno)
+      if (yearMatch && dayMatch) {
+        return new Date(parseInt(yearMatch[1], 10), monthIndex, parseInt(dayMatch[1], 10));
+      }
+    }
+  }
+  
+  return null;
 };
 
 // ✅ Helper: verifica se una circolare appartiene all'anno scolastico selezionato
 const isCircularInSchoolYear = (circular: SavedCircular, schoolYear: string) => {
   const { startDate, endDate } = getSchoolYearRange(schoolYear);
   if (!circular.date) return false;
-  const [day, month, year] = circular.date.split("/").map(Number);
-  const circDate = new Date(year, month - 1, day);
-  return circDate >= startDate && circDate <= endDate;
+  
+  const circDate = parseItalianDate(circular.date);
+  
+  if (circDate && !isNaN(circDate.getTime())) {
+    return circDate >= startDate && circDate <= endDate;
+  }
+  
+  // Fallback: se la data non è parsabile, ma contiene l'anno scolastico, la mostriamo comunque
+  const [startYear] = schoolYear.split("/").map(Number);
+  if (circular.date.includes(startYear.toString()) || circular.date.includes((startYear + 1).toString())) {
+    return true;
+  }
+  
+  return false;
 };
 
 const renderNumberedSummary = (summary: string) => {
@@ -57,7 +101,6 @@ export default function Circulars() {
   const [isDeleting, setIsDeleting] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   
-  // ✅ Selettore Anno Scolastico
   const [selectedSchoolYear, setSelectedSchoolYear] = useState(() => {
     return localStorage.getItem("selectedSchoolYear") || "2025/2026";
   });
@@ -66,19 +109,14 @@ export default function Circulars() {
     fetchSavedCirculars();
   }, []);
 
-  // ✅ Salva preferenza anno scolastico
   useEffect(() => {
     localStorage.setItem("selectedSchoolYear", selectedSchoolYear);
   }, [selectedSchoolYear]);
 
   useEffect(() => {
-    // ✅ Filtra circolari per anno scolastico e termine di ricerca
     let filtered = savedCirculars;
-    
-    // Filtra per anno scolastico
     filtered = filtered.filter(circ => isCircularInSchoolYear(circ, selectedSchoolYear));
     
-    // Filtra per termine di ricerca
     if (searchTerm.trim()) {
       const term = searchTerm.toLowerCase();
       filtered = filtered.filter(circ => {
@@ -86,7 +124,6 @@ export default function Circulars() {
         const subjectMatch = circ.subject.toLowerCase().includes(term);
         const dateMatch = circ.date.toLowerCase().includes(term);
         const fileNameMatch = circ.fileName.toLowerCase().includes(term);
-        
         return numberMatch || subjectMatch || dateMatch || fileNameMatch;
       });
     }
@@ -96,7 +133,7 @@ export default function Circulars() {
 
   const fetchSavedCirculars = async () => {
     try {
-      const response = await fetch("https://school-agent-backend.onrender.com/api/circulars");
+      const response = await fetch("https://school-agent-backend.onrender.com/api/circulars?t=" + Date.now());
       if (response.ok) {
         const data = await response.json();
         setSavedCirculars(data);
@@ -109,9 +146,8 @@ export default function Circulars() {
 
   const handleDeleteCircular = async (id: string, numero: string) => {
     const confirmed = window.confirm(
-      `⚠️ Sei sicuro di voler eliminare la Circolare n. ${numero}?\n\nQuesta azione eliminerà anche tutti gli eventi associati e non potrà essere annullata.`
+      `⚠️ Sei sicuro di voler eliminare la Circolare n. ${numero}?\n\nQuesta azione eliminerà anche tutti gli eventi associati.`
     );
-
     if (!confirmed) return;
 
     setIsDeleting(id);
@@ -129,7 +165,6 @@ export default function Circulars() {
       }
     } catch (err: any) {
       alert(`❌ Errore: ${err.message}`);
-      console.error("Errore nell'eliminazione della circolare:", err);
     } finally {
       setIsDeleting(null);
     }
@@ -151,7 +186,6 @@ export default function Circulars() {
       }
 
       const formData = new FormData();
-      // ✅ CORREZIONE CRUCIALE: il backend si aspetta il campo chiamato 'pdf', non 'file'
       formData.append('pdf', file); 
       if (text) formData.append('text', text);
 
@@ -166,13 +200,11 @@ export default function Circulars() {
       }
 
       await fetchSavedCirculars();
-      event.target.value = ""; // Resetta il campo di input
-      
+      event.target.value = "";
     } catch (err: any) {
       console.error("Errore nell'elaborazione:", err);
       setProcessError(err.message || "Errore durante l'elaborazione del file.");
     } finally {
-      // ✅ Garantisce che la rotellina si fermi SEMPRE, anche in caso di errore
       setIsProcessing(false);
     }
   };
@@ -205,14 +237,10 @@ export default function Circulars() {
 
   return (
     <div className="space-y-8 max-w-7xl mx-auto">
-      {/* BARRA STICKY: Titolo + Ricerca + Upload + Anno Scolastico */}
       <div className="sticky top-0 z-20 bg-slate-950 border-b border-slate-800 shadow-lg">
-        {/* Riga 1: Titolo, Ricerca e Anno Scolastico */}
         <div className="flex justify-between items-center px-6 py-4 border-b border-slate-800">
           <h1 className="text-2xl font-bold text-white">Gestione Circolari</h1>
-          
           <div className="flex items-center gap-4">
-            {/* Selettore Anno Scolastico */}
             <div className="flex items-center gap-2">
               <label className="text-sm text-slate-400 font-medium">Anno Scolastico:</label>
               <select
@@ -224,8 +252,6 @@ export default function Circulars() {
                 <option value="2026/2027">2026/2027</option>
               </select>
             </div>
-            
-            {/* Barra di ricerca */}
             <div className="relative w-96">
               <input
                 type="text"
@@ -234,32 +260,16 @@ export default function Circulars() {
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="w-full px-4 py-2 pl-10 pr-4 text-sm border border-slate-600 bg-slate-800 text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent placeholder-slate-400"
               />
-              <svg
-                className="absolute left-3 top-2.5 h-5 w-5 text-slate-400"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-                />
+              <svg className="absolute left-3 top-2.5 h-5 w-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
               </svg>
               {searchTerm && (
-                <button
-                  onClick={() => setSearchTerm("")}
-                  className="absolute right-3 top-2.5 text-slate-400 hover:text-white"
-                >
-                  ✕
-                </button>
+                <button onClick={() => setSearchTerm("")} className="absolute right-3 top-2.5 text-slate-400 hover:text-white">✕</button>
               )}
             </div>
           </div>
         </div>
 
-        {/* Riga 2: Carica Nuova Circolare */}
         <div className="px-6 py-4 bg-slate-900">
           <h2 className="text-lg font-semibold mb-3 text-white">Carica Nuova Circolare</h2>
           <label className="block">
@@ -275,7 +285,6 @@ export default function Circulars() {
         </div>
       </div>
 
-      {/* Contenuto scrollabile */}
       <div className="p-6 space-y-8">
         {processError && (
           <div className="bg-red-50 border-l-4 border-red-500 text-red-700 p-4 rounded">
@@ -291,7 +300,6 @@ export default function Circulars() {
           </div>
         )}
 
-        {/* Mostra risultati della ricerca */}
         {searchTerm && (
           <div className="text-sm text-gray-300">
             Trovate <span className="font-semibold">{filteredCirculars.length}</span> circolari per "{searchTerm}" nell'a.s. {selectedSchoolYear}
@@ -305,17 +313,12 @@ export default function Circulars() {
           
           {filteredCirculars.length === 0 ? (
             <p className="text-gray-500 italic">
-              {searchTerm 
-                ? `Nessuna circolare trovata per "${searchTerm}" nell'a.s. ${selectedSchoolYear}.` 
-                : `Nessuna circolare caricata per l'anno scolastico ${selectedSchoolYear}.`}
+              {searchTerm ? `Nessuna circolare trovata per "${searchTerm}".` : `Nessuna circolare caricata per l'anno scolastico ${selectedSchoolYear}.`}
             </p>
           ) : (
             <div className="space-y-4">
               {filteredCirculars.map((circ) => (
-                <div 
-                  key={circ.id} 
-                  className="p-4 rounded-lg border bg-gray-50 border-gray-200 transition-all hover:shadow-md"
-                >
+                <div key={circ.id} className="p-4 rounded-lg border bg-gray-50 border-gray-200 transition-all hover:shadow-md">
                   <div className="flex justify-between items-start mb-4">
                     <div>
                       <p className="font-bold text-gray-900 text-lg">
@@ -333,23 +336,10 @@ export default function Circulars() {
                         disabled={isDeleting === circ.id}
                         className="text-xs bg-red-600 hover:bg-red-700 disabled:bg-red-400 text-white px-3 py-1.5 rounded-md transition-colors font-medium flex items-center gap-1"
                       >
-                        {isDeleting === circ.id ? (
-                          <>
-                            <span className="animate-spin mr-1"></span> Elimino...
-                          </>
-                        ) : (
-                          <>
-                            <span>🗑️</span> Elimina
-                          </>
-                        )}
+                        {isDeleting === circ.id ? "Elimino..." : "🗑️ Elimina"}
                       </button>
-                      
-                      <button onClick={() => handleDownloadPDF(circ)} className="text-xs bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 px-3 py-1.5 rounded-md transition-colors font-medium">
-                        📄 PDF
-                      </button>
-                      <button onClick={() => handleDownloadICS(circ)} className="text-xs bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-md transition-colors font-medium">
-                        📅 .ics
-                      </button>
+                      <button onClick={() => handleDownloadPDF(circ)} className="text-xs bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 px-3 py-1.5 rounded-md transition-colors font-medium">📄 PDF</button>
+                      <button onClick={() => handleDownloadICS(circ)} className="text-xs bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-md transition-colors font-medium">📅 .ics</button>
                     </div>
                   </div>
 
@@ -357,9 +347,7 @@ export default function Circulars() {
                     <h4 className="text-sm font-bold text-blue-900 mb-3 flex items-center gap-2">
                       <span>📋</span> Ordine del Giorno
                     </h4>
-                    <div className="mb-6">
-                      {renderNumberedSummary(circ.summary)}
-                    </div>
+                    <div className="mb-6">{renderNumberedSummary(circ.summary)}</div>
                     
                     {circ.events && circ.events.length > 0 && (
                       <>
