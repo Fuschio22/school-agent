@@ -5,8 +5,11 @@ import fs from "fs";
 import { 
   analyzeCircularController, 
   getAllCircularsController,
-  deleteCircularController // <-- AGGIUNTO: import per l'eliminazione
+  deleteCircularController
 } from "../controllers/circularController";
+
+// ✅ NUOVO: Importa il controller per aggiornare gli eventi
+import { updateEvent } from "../controllers/eventController";
 
 const router = Router();
 
@@ -39,5 +42,8 @@ router.post("/analyze", upload.single('pdf'), analyzeCircularController);
 
 // ELIMINA una circolare specifica per ID
 router.delete("/:id", deleteCircularController);
+
+// ✅ NUOVO: Aggiorna un singolo evento all'interno di una circolare
+router.patch("/:circularId/events/:eventId", updateEvent);
 
 export default router;

@@ -362,9 +362,14 @@ export default function Circulars() {
                     {circ.events && circ.events.length > 0 && (
                       <>
                         <h4 className="text-sm font-bold text-blue-900 mb-3 flex items-center gap-2">
-                          <span>📅</span> Calendario Eventi ({circ.events.length})
+                          <span></span> Calendario Eventi ({circ.events.length})
                         </h4>
-                        <VisualCalendar events={circ.events} />
+                        {/* ✅ MODIFICA: passaggio di circularId e onEventUpdated per abilitare la modifica eventi */}
+                        <VisualCalendar 
+                          events={circ.events} 
+                          circularId={circ.id} 
+                          onEventUpdated={fetchSavedCirculars} 
+                        />
                       </>
                     )}
                   </div>

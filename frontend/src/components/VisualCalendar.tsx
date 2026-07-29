@@ -1,166 +1,202 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 
-interface Event {
+type Event = {
   id: string;
   title: string;
+  type: string;
   date: string;
   startTime: string;
   endTime: string;
-  location: string;
-  type: string;
-}
+  location?: string;
+  sede?: string;
+  classe?: string;
+};
 
-interface VisualCalendarProps {
+type VisualCalendarProps = {
   events: Event[];
-}
+  circularId?: string;
+  onEventUpdated?: () => void;
+};
 
-export default function VisualCalendar({ events }: VisualCalendarProps) {
-  const [currentDate, setCurrentDate] = useState(new Date());
-  const [selectedDate, setSelectedDate] = useState<string | null>(null);
+export default function VisualCalendar({ events, circularId, onEventUpdated }: VisualCalendarProps) {
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingEvent, setEditingEvent] = useState<Event | null>(null);
+  
+  const [formData, setFormData] = useState({
+    title: "",
+    type: "",
+    sede: "",
+    startTime: "",
+    endTime: "",
+  });
 
-  useEffect(() => {
-    if (events && events.length > 0) {
-      const firstEvent = events[0];
-      const [_day, month, year] = firstEvent.date.split("/").map(Number);
-      setCurrentDate(new Date(year, month - 1, 1));
-    }
-  }, [events]);
-
-  const year = currentDate.getFullYear();
-  const month = currentDate.getMonth();
-
-  const firstDayOfMonth = new Date(year, month, 1);
-  const lastDayOfMonth = new Date(year, month + 1, 0);
-  const daysInMonth = lastDayOfMonth.getDate();
-  const startingDayOfWeek = firstDayOfMonth.getDay();
-
-  const monthNames = ["Gennaio", "Febbraio", "Marzo", "Aprile", "Maggio", "Giugno", "Luglio", "Agosto", "Settembre", "Ottobre", "Novembre", "Dicembre"];
-  const dayNames = ["Dom", "Lun", "Mar", "Mer", "Gio", "Ven", "Sab"];
-
-  const parseDate = (dateStr: string) => {
-    const [day, m, y] = dateStr.split("/").map(Number);
-    return `${y}-${String(m).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+  const handleEditClick = (event: Event) => {
+    setEditingEvent(event);
+    setFormData({
+      title: event.title,
+      type: event.type,
+      sede: event.sede || event.location || "",
+      startTime: event.startTime,
+      endTime: event.endTime,
+    });
+    setIsModalOpen(true);
   };
 
-  const eventsByDate: Record<string, Event[]> = {};
-  events.forEach((event) => {
-    const key = parseDate(event.date);
-    if (!eventsByDate[key]) eventsByDate[key] = [];
-    eventsByDate[key].push(event);
-  });
+  const handleSave = async () => {
+    if (!editingEvent || !circularId) return;
 
-  Object.keys(eventsByDate).forEach(key => {
-    eventsByDate[key].sort((a, b) => a.startTime.localeCompare(b.startTime));
-  });
+    try {
+      const response = await fetch(
+        `https://school-agent-backend.onrender.com/api/circulars/${circularId}/events/${editingEvent.id}`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            title: formData.title,
+            type: formData.type,
+            sede: formData.sede,
+            location: formData.sede, // Mappiamo anche location per sicurezza
+            oraInizio: formData.startTime, // Nome atteso dal backend
+            oraFine: formData.endTime,     // Nome atteso dal backend
+          }),
+        }
+      );
 
-  const handlePrevMonth = () => setCurrentDate(new Date(year, month - 1, 1));
-  const handleNextMonth = () => setCurrentDate(new Date(year, month + 1, 1));
-
-  const days = [];
-  for (let i = 0; i < startingDayOfWeek; i++) {
-    days.push(<div key={`empty-${i}`} className="h-28 border border-gray-100 bg-gray-50/50"></div>);
-  }
-
-  for (let day = 1; day <= daysInMonth; day++) {
-    const dateKey = `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
-    const dayEvents = eventsByDate[dateKey] || [];
-    const isSelected = selectedDate === dateKey;
-
-    days.push(
-      <div
-        key={day}
-        onClick={() => setSelectedDate(isSelected ? null : dateKey)}
-        className={`h-28 border border-gray-200 p-2 cursor-pointer transition-all ${
-          isSelected 
-            ? "bg-blue-100 ring-2 ring-blue-500 ring-inset shadow-md" 
-            : "bg-white hover:bg-blue-50"
-        }`}
-      >
-        <div className="flex justify-between items-start mb-1">
-          <span className={`text-sm font-bold ${dayEvents.length > 0 ? "text-blue-700" : "text-gray-700"}`}>
-            {day}
-          </span>
-          {dayEvents.length > 0 && (
-            <span className="flex h-5 w-5 items-center justify-center rounded-full bg-blue-600 text-[10px] font-bold text-white">
-              {dayEvents.length}
-            </span>
-          )}
-        </div>
-        <div className="space-y-1">
-          {dayEvents.slice(0, 3).map((event, idx) => (
-            <div key={idx} className="truncate text-[10px] bg-blue-100 text-blue-800 px-1.5 py-0.5 rounded font-medium">
-              {event.startTime} {event.title.split(" - ")[0]}
-            </div>
-          ))}
-          {dayEvents.length > 3 && (
-            <div className="text-[10px] text-blue-600 font-semibold">+{dayEvents.length - 3} altri →</div>
-          )}
-        </div>
-      </div>
-    );
-  }
-
-  const selectedDayEvents = selectedDate ? eventsByDate[selectedDate] || [] : [];
-  const [selYear, selMonth, selDay] = selectedDate ? selectedDate.split("-").map(Number) : [0, 0, 0];
+      if (response.ok) {
+        alert("✅ Evento aggiornato con successo!");
+        setIsModalOpen(false);
+        setEditingEvent(null);
+        if (onEventUpdated) {
+          onEventUpdated(); // Ricarica i dati nella pagina padre
+        }
+      } else {
+        const err = await response.json();
+        alert(`❌ Errore: ${err.error || "Impossibile aggiornare l'evento"}`);
+      }
+    } catch (error) {
+      console.error("Errore di rete:", error);
+      alert("❌ Errore di connessione al server");
+    }
+  };
 
   return (
-    <div className="bg-white shadow-sm border border-gray-200 rounded-lg p-6">
-      <div className="flex justify-between items-center mb-6">
-        <h2 className="text-lg font-semibold flex items-center gap-2">
-          <span>📅</span> Calendario Eventi
-        </h2>
-        <div className="flex items-center gap-4">
-          <button onClick={handlePrevMonth} className="p-2 hover:bg-gray-100 rounded-full transition-colors">
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
-          </button>
-          <span className="text-lg font-bold text-gray-800 min-w-[180px] text-center">
-            {monthNames[month]} {year}
-          </span>
-          <button onClick={handleNextMonth} className="p-2 hover:bg-gray-100 rounded-full transition-colors">
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
-          </button>
-        </div>
-      </div>
-
-      <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg text-sm text-yellow-800">
-        💡 <strong>Click su un giorno</strong> per vedere tutti gli eventi dettagliati
-      </div>
-
-      <div className="grid grid-cols-7 gap-px bg-gray-200 border border-gray-200 rounded-lg overflow-hidden">
-        {dayNames.map((day) => (
-          <div key={day} className="bg-gray-50 p-2 text-center text-xs font-semibold text-gray-600 uppercase">
-            {day}
-          </div>
-        ))}
-        {days}
-      </div>
-
-      {selectedDate && (
-        <div className="mt-6 p-6 bg-gradient-to-br from-blue-50 to-indigo-50 border-2 border-blue-300 rounded-lg shadow-lg animate-in fade-in slide-in-from-bottom-2">
-          <div className="flex justify-between items-center mb-4">
-            <h3 className="text-xl font-bold text-blue-900">
-               Eventi del {selDay}/{selMonth}/{selYear}
-            </h3>
-            <span className="bg-blue-600 text-white px-3 py-1 rounded-full text-sm font-bold">
-              {selectedDayEvents.length} eventi
-            </span>
+    <div className="space-y-3">
+      {events.map((event, index) => (
+        <div
+          key={event.id || index}
+          className="flex items-center justify-between p-4 bg-blue-50 border border-blue-200 rounded-lg hover:shadow-md transition-all"
+        >
+          <div className="flex-1">
+            <div className="flex items-center gap-2 mb-1 flex-wrap">
+              <span className="font-semibold text-blue-900 text-base">{event.title}</span>
+              <span className="text-xs bg-blue-600 text-white px-2 py-0.5 rounded-full font-medium">
+                {event.type}
+              </span>
+              {event.classe && (
+                <span className="text-xs bg-gray-200 text-gray-700 px-2 py-0.5 rounded-full font-medium">
+                  {event.classe}
+                </span>
+              )}
+            </div>
+            <div className="text-sm text-blue-700 flex items-center gap-4">
+              <span>🕒 {event.startTime} - {event.endTime}</span>
+              <span>📍 {event.location || event.sede || "Sede non specificata"}</span>
+            </div>
           </div>
           
-          <div className="space-y-3">
-            {selectedDayEvents.map((event, idx) => (
-              <div key={event.id || idx} className="flex justify-between items-center bg-white p-4 rounded-lg shadow-sm border-l-4 border-blue-500 hover:shadow-md transition-shadow">
-                <div className="flex-1">
-                  <p className="font-bold text-gray-900 text-base">{event.title}</p>
-                  <p className="text-sm text-gray-600 mt-1">📍 {event.location}</p>
+          <button
+            onClick={() => handleEditClick(event)}
+            className="ml-4 text-blue-600 hover:text-blue-800 hover:bg-blue-100 p-2 rounded-lg transition-colors"
+            title="Modifica questo evento"
+          >
+            ✏️ Modifica
+          </button>
+        </div>
+      ))}
+
+      {/* MODALE DI MODIFICA */}
+      {isModalOpen && editingEvent && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl border border-gray-200">
+            <h3 className="text-xl font-bold mb-4 text-gray-800 flex items-center gap-2">
+              ✏️ Modifica Evento
+            </h3>
+            
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-1">Titolo</label>
+                <input
+                  type="text"
+                  value={formData.title}
+                  onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-1">Tipo Evento</label>
+                <select
+                  value={formData.type}
+                  onChange={(e) => setFormData({ ...formData, type: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                >
+                  <option value="Consigli di Classe">Consigli di Classe</option>
+                  <option value="Collegio dei Docenti">Collegio dei Docenti</option>
+                  <option value="Collegio di Plesso">Collegio di Plesso</option>
+                  <option value="Dipartimenti">Dipartimenti</option>
+                  <option value="GLO">GLO</option>
+                  <option value="Colloqui">Colloqui</option>
+                  <option value="Riunione">Riunione</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-1">Sede / Luogo</label>
+                <input
+                  type="text"
+                  value={formData.sede}
+                  onChange={(e) => setFormData({ ...formData, sede: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="es. Sede Biscollai, Via Toscana, ecc."
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1">Ora Inizio</label>
+                  <input
+                    type="time"
+                    value={formData.startTime}
+                    onChange={(e) => setFormData({ ...formData, startTime: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
                 </div>
-                <div className="text-right ml-4">
-                  <p className="font-bold text-blue-700 text-lg">{event.startTime} - {event.endTime}</p>
-                  <span className="inline-block mt-1 text-xs bg-blue-100 text-blue-800 px-3 py-1 rounded-full font-semibold">
-                    {event.type}
-                  </span>
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1">Ora Fine</label>
+                  <input
+                    type="time"
+                    value={formData.endTime}
+                    onChange={(e) => setFormData({ ...formData, endTime: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
                 </div>
               </div>
-            ))}
+            </div>
+
+            <div className="flex gap-3 mt-6">
+              <button
+                onClick={handleSave}
+                className="flex-1 bg-blue-600 text-white py-2.5 rounded-lg hover:bg-blue-700 font-semibold transition-colors"
+              >
+                💾 Salva Modifiche
+              </button>
+              <button
+                onClick={() => { setIsModalOpen(false); setEditingEvent(null); }}
+                className="flex-1 bg-gray-200 text-gray-700 py-2.5 rounded-lg hover:bg-gray-300 font-semibold transition-colors"
+              >
+                Annulla
+              </button>
+            </div>
           </div>
         </div>
       )}
