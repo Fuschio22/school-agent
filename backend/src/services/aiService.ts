@@ -20,7 +20,7 @@ export async function analyzeCircularText(text: string, userClasses: string[] = 
   
   if (isChironi && !isPira) {
     relevantClasses = userClasses.filter(c => c.toUpperCase().includes("OR"));
-    schoolContext = "\n\n SCUOLA: CHIRONI-SATTA (Nuoro)\n" +
+    schoolContext = "\n\n🏫 SCUOLA: CHIRONI-SATTA (Nuoro)\n" +
                    `CLASSI RILEVANTI: ${relevantClasses.join(', ')}\n` +
                    "ISTRUZIONE: Estrai SOLO eventi per queste classi OR. Ignora tutte le altre.";
     schoolName = "ITC Chironi-Satta";
@@ -77,8 +77,24 @@ REGOLE FONDAMENTALI:
    - OdG = argomenti (NON eventi)
    - Eventi = riunioni con data/ora
 
-3. CAMPO "type" - CATEGORIE FISSE OBBLIGATORIE:
-   Il campo "type" DEVE essere UNA DI QUESTE CATEGORIE ESATTE (non inventare altre categorie!):
+3. GESTIONE ORARI (REGOLA CRITICA):
+   - Se la circolare specifica ENTRAMBI gli orari (inizio E fine), usali ESATTAMENTE come scritti
+   - Se la circolare specifica SOLO l'ora di inizio, AGGIUNGI la durata standard:
+     * Collegio dei Docenti → aggiungi 1h30m (es: 10:30 → 12:00)
+     * Consiglio di Classe → aggiungi 1h30m (es: 15:00 → 16:30)
+     * Collegio di Plesso → aggiungi 1h (es: 10:00 → 11:00)
+     * Dipartimenti → aggiungi 1h (es: 10:00 → 11:00)
+     * GLO → aggiungi 1h (es: 15:00 → 16:00)
+   
+   - ESEMPIO CORRETTO:
+     * Testo: "alle h.10.30" (solo inizio)
+     * Tipo: "Collegio dei Docenti"
+     * Risultato: oraInizio: "10:30", oraFine: "12:00" (NON "16:00"!)
+   
+   - VERIFICA SEMPRE: oraFine deve essere circa 1-1.5 ore dopo oraInizio, NON 5-6 ore dopo!
+
+4. CAMPO "type" - CATEGORIE FISSE:
+   Il campo "type" DEVE essere UNA DI QUESTE CATEGORIE ESATTE:
    - "Consigli di Classe"
    - "Collegio dei Docenti"
    - "Collegio di Plesso"
@@ -88,10 +104,8 @@ REGOLE FONDAMENTALI:
    
    ❌ SBAGLIATO: "per area disciplinare", "plenario", "dipartimenti disciplinari"
    ✅ CORRETTO: "Dipartimenti", "Collegio dei Docenti", "Collegio di Plesso"
-   
-   Il campo "type" serve per il badge colorato nel calendario. Deve essere UNA SOLA PAROLA CATEGORIA.
 
-4. CAMPO "title" - TITOLO COMPLETO:
+5. CAMPO "title" - TITOLO COMPLETO:
    - Il titolo deve essere descrittivo e completo:
      ✅ "Dipartimenti disciplinari ITC Chironi-Satta"
      ✅ "Collegio dei Docenti plenario"
@@ -99,27 +113,27 @@ REGOLE FONDAMENTALI:
      ❌ "per area disciplinare" (troppo generico)
      ❌ "plenario" (troncato)
 
-5. LETTURA LISTE DI EVENTI:
+6. LETTURA LISTE DI EVENTI:
    - Quando vedi una lista con orari diversi, crea UN EVENTO PER OGNI RIGA
 
-6. FILTRO EVENTI DA ESCLUDERE:
+7. FILTRO EVENTI DA ESCLUDERE:
    - ESCLUDI eventi che contengono: "sostegno", "inclusione"
 
-7. TITOLI EVENTI - AGGIUNGI ISTITUTO SE NECESSARIO:
+8. TITOLI EVENTI - AGGIUNGI ISTITUTO SE NECESSARIO:
    - Se il titolo è troppo generico, aggiungi il nome dell'istituto
 
-8. NORMALIZZAZIONE CLASSI:
+9. NORMALIZZAZIONE CLASSI:
    - "1 OR" → "1AOR"
    - "5A OR" → "5AOR"
 
-9. ASSOCIAZIONE SEDI:
-   - Classi OR → "Sede Orosei"
-   - Classi AS/BS → "Sede Biscollai"
-   - IPSASR → "Via Toscana"
+10. ASSOCIAZIONE SEDI:
+    - Classi OR → "Sede Orosei"
+    - Classi AS/BS → "Sede Biscollai"
+    - IPSASR → "Via Toscana"
 
-10. ${schoolContext}
+11. ${schoolContext}
 
-11. JSON valido, niente markdown.
+12. JSON valido, niente markdown.
 `
       },
       {
@@ -132,13 +146,13 @@ REGOLE FONDAMENTALI:
 
   const content = response.choices[0]?.message?.content || "{}";
   console.log("🤖 RAW AI JSON OUTPUT:", content);
-  console.log(" Scuola identificata:", isChironi ? "Chironi-Satta" : isPira ? "Pira" : "Sconosciuta");
-  console.log("📚 Classi rilevanti:", relevantClasses);
+  console.log("🏫 Scuola identificata:", isChironi ? "Chironi-Satta" : isPira ? "Pira" : "Sconosciuta");
+  console.log(" Classi rilevanti:", relevantClasses);
   
   try {
     return JSON.parse(content);
   } catch (error) {
-    console.error("❌ Errore parsing JSON:", error);
+    console.error(" Errore parsing JSON:", error);
     return {
       circolare: { numero: "N/D", data: "N/D", oggetto: "Errore", destinatari: [] },
       eventi: [],
