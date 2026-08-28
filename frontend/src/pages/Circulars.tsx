@@ -312,32 +312,69 @@ export default function Circulars() {
     setProcessError(null);
 
     try {
+      // ========================================================
+      // 1. ESTRAZIONE TESTO DAL PDF
+      // ========================================================
+
       let text = "";
 
       try {
         text =
           await extractTextFromPDF(file);
+
+        console.log(
+          "📄 Testo estratto dal PDF:",
+          text.length,
+          "caratteri"
+        );
       } catch (e) {
         console.warn(
-          "Impossibile estrarre testo dal PDF, invio solo il file:",
+          "⚠️ Impossibile estrarre il testo dal PDF:",
           e
         );
       }
 
+      // ========================================================
+      // 2. CREA FORM DATA
+      // ========================================================
+
       const formData =
         new FormData();
 
+      // PDF vero e proprio
       formData.append(
         "pdf",
         file
       );
 
-      if (text) {
-        formData.append(
-          "text",
-          text
-        );
-      }
+      // Il backend richiede il campo "text".
+      // Se il PDF non contiene testo estraibile,
+      // inviamo comunque una stringa vuota.
+      formData.append(
+        "text",
+        text || ""
+      );
+
+      // Nome del file
+      formData.append(
+        "fileName",
+        file.name
+      );
+
+      console.log(
+        "📤 Invio PDF al backend:",
+        file.name
+      );
+
+      console.log(
+        "📤 Testo inviato:",
+        text.length,
+        "caratteri"
+      );
+
+      // ========================================================
+      // 3. INVIO AL BACKEND
+      // ========================================================
 
       const response = await fetch(
         "https://school-agent-backend.onrender.com/api/circulars/analyze",
@@ -346,6 +383,10 @@ export default function Circulars() {
           body: formData,
         }
       );
+
+      // ========================================================
+      // 4. GESTIONE RISPOSTA
+      // ========================================================
 
       if (!response.ok) {
         const errorData =
@@ -360,12 +401,20 @@ export default function Circulars() {
         );
       }
 
+      console.log(
+        "✅ Circolare elaborata con successo"
+      );
+
+      // ========================================================
+      // 5. AGGIORNA ARCHIVIO
+      // ========================================================
+
       await fetchSavedCirculars();
 
       event.target.value = "";
     } catch (err: any) {
       console.error(
-        "Errore nell'elaborazione:",
+        "❌ Errore nell'elaborazione:",
         err
       );
 
