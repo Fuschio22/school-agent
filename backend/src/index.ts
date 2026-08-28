@@ -30,6 +30,29 @@ app.use(express.json({ limit: "10mb" }));
 // Rende i PDF accessibili dal browser
 app.use("/uploads", express.static(uploadsDir));
 
+// DEBUG: verifica se Render trova realmente il PDF
+app.get("/debug/uploads/:filename", (req, res) => {
+  const filePath = path.join(uploadsDir, req.params.filename);
+
+  console.log("🔎 DEBUG PDF:", filePath);
+  console.log("🔎 FILE ESISTE:", fs.existsSync(filePath));
+
+  if (!fs.existsSync(filePath)) {
+    return res.status(404).json({
+      exists: false,
+      path: filePath,
+      files: fs.existsSync(uploadsDir)
+        ? fs.readdirSync(uploadsDir)
+        : []
+    });
+  }
+
+  return res.json({
+    exists: true,
+    path: filePath
+  });
+});
+
 app.use("/api/circulars", circularRoutes);
 app.use("/api/chat", chatRoutes);
 app.use("/api/users", userRoutes);
