@@ -187,7 +187,7 @@ export default function Circulars() {
 
       const formData = new FormData();
       formData.append('pdf', file); 
-      if (text) formData.append('text', text);
+      formData.append('text', text);
 
       const response = await fetch("https://school-agent-backend.onrender.com/api/circulars/analyze", {
         method: 'POST',
