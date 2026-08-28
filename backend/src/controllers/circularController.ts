@@ -3,7 +3,10 @@ import { analyzeCircularText } from "../services/aiService";
 import { prisma } from "../lib/prisma";
 import { filterEvents } from "../utils/classFilter";
 
-// Funzione per estrarre il mese e anno dal titolo/oggetto
+// ============================================================
+// FUNZIONE: ESTRAE MESE E ANNO DAL TESTO
+// ============================================================
+
 function extractMonthYear(
   text: string
 ): { month: string; year: string } | null {
@@ -40,7 +43,10 @@ function extractMonthYear(
   return null;
 }
 
-// Funzione per verificare se è una rettifica
+// ============================================================
+// FUNZIONE: VERIFICA SE È UNA RETTIFICA
+// ============================================================
+
 function isRettifica(text: string): boolean {
   const lowerText = text.toLowerCase();
 
@@ -59,10 +65,15 @@ function isRettifica(text: string): boolean {
   );
 }
 
-/**
- * Analizza una circolare, salva i dati nel database
- * e salva anche il PDF direttamente nel database.
- */
+// ============================================================
+// ANALIZZA E SALVA UNA CIRCOLARE
+//
+// Il PDF viene salvato direttamente nel database Neon
+// tramite il campo Prisma fileData (Bytes).
+//
+// NON viene utilizzato il filesystem di Render.
+// ============================================================
+
 export const analyzeCircularController = async (
   req: Request,
   res: Response
@@ -72,10 +83,11 @@ export const analyzeCircularController = async (
 
     const uploadedFile = req.file || null;
 
-    const filePath = uploadedFile ? uploadedFile.path : null;
-
-    // Il PDF viene convertito in Buffer e salvato nel database.
-    const fileData = uploadedFile ? uploadedFile.buffer : null;
+    if (!uploadedFile) {
+      return res.status(400).json({
+        error: "Il file PDF è obbligatorio",
+      });
+    }
 
     if (!text) {
       return res.status(400).json({
@@ -83,18 +95,27 @@ export const analyzeCircularController = async (
       });
     }
 
-    if (!uploadedFile) {
-      return res.status(400).json({
-        error: "Il file PDF è obbligatorio",
-      });
-    }
+    // ============================================================
+    // PDF IN MEMORIA
+    // ============================================================
 
-    console.log("📄 File ricevuto:", uploadedFile.originalname);
-    console.log("📄 Percorso temporaneo:", filePath);
+    // multer usa memoryStorage(), quindi il PDF è disponibile
+    // direttamente come Buffer.
+    const fileData = uploadedFile.buffer;
+
+    console.log(
+      "📄 File ricevuto:",
+      uploadedFile.originalname
+    );
+
     console.log(
       "📄 Dimensione PDF:",
       uploadedFile.size,
       "bytes"
+    );
+
+    console.log(
+      "💾 PDF pronto per essere salvato nel database"
     );
 
     // ============================================================
@@ -140,13 +161,20 @@ export const analyzeCircularController = async (
       userClasses
     );
 
-    console.log("🤖 AI estrazione completata");
+    console.log(
+      "🤖 AI estrazione completata"
+    );
 
-    const circData = analysis.circolare || analysis;
+    const circData =
+      analysis.circolare || analysis;
 
-    const eventsData = Array.isArray(analysis.eventi)
+    const eventsData = Array.isArray(
+      analysis.eventi
+    )
       ? analysis.eventi
-      : Array.isArray(analysis.consigliDiClasse)
+      : Array.isArray(
+          analysis.consigliDiClasse
+        )
       ? analysis.consigliDiClasse
       : [];
 
@@ -169,55 +197,76 @@ export const analyzeCircularController = async (
     // 4. VALIDAZIONE ORARI
     // ============================================================
 
-    const validatedEventsData = filteredEventsData.map(
-      (event: any) => {
-        if (event.oraInizio && event.oraFine) {
-          const [hInizio, mInizio] = event.oraInizio
-            .split(":")
-            .map(Number);
+    const validatedEventsData =
+      filteredEventsData.map(
+        (event: any) => {
+          if (
+            event.oraInizio &&
+            event.oraFine
+          ) {
+            const [
+              hInizio,
+              mInizio,
+            ] = event.oraInizio
+              .split(":")
+              .map(Number);
 
-          const [hFine, mFine] = event.oraFine
-            .split(":")
-            .map(Number);
+            const [
+              hFine,
+              mFine,
+            ] = event.oraFine
+              .split(":")
+              .map(Number);
 
-          const minutiInizio =
-            hInizio * 60 + mInizio;
+            const minutiInizio =
+              hInizio * 60 + mInizio;
 
-          const minutiFine =
-            hFine * 60 + mFine;
+            const minutiFine =
+              hFine * 60 + mFine;
 
-          if (minutiFine <= minutiInizio) {
-            const nuoviMinutiFine =
-              minutiInizio + 45;
+            if (
+              minutiFine <=
+              minutiInizio
+            ) {
+              const nuoviMinutiFine =
+                minutiInizio + 45;
 
-            const nuoveOre = Math.floor(
-              nuoviMinutiFine / 60
-            );
+              const nuoveOre =
+                Math.floor(
+                  nuoviMinutiFine / 60
+                );
 
-            const nuoviMinuti =
-              nuoviMinutiFine % 60;
+              const nuoviMinuti =
+                nuoviMinutiFine % 60;
 
-            const nuovaOraFine =
-              `${nuoveOre
-                .toString()
-                .padStart(2, "0")}:${nuoviMinuti
-                .toString()
-                .padStart(2, "0")}`;
+              const nuovaOraFine =
+                `${nuoveOre
+                  .toString()
+                  .padStart(
+                    2,
+                    "0"
+                  )}:${nuoviMinuti
+                  .toString()
+                  .padStart(
+                    2,
+                    "0"
+                  )}`;
 
-            console.log(
-              `⚠️ Corretto orario invertito per ${event.classe}: ${event.oraFine} → ${nuovaOraFine}`
-            );
+              console.log(
+                `⚠️ Corretto orario invertito per ${event.classe}: ${event.oraFine} → ${nuovaOraFine}`
+              );
 
-            return {
-              ...event,
-              oraFine: nuovaOraFine,
-            };
+              return {
+                ...event,
+                oraFine:
+                  nuovaOraFine,
+              };
+            }
           }
-        }
 
-        return event;
-      }
-    );
+          return event;
+        }
+      );
 
     console.log(
       `🔍 Filtro applicato: da ${eventsData.length} eventi estratti dall'AI a ${validatedEventsData.length} eventi finali permessi.`
@@ -239,15 +288,21 @@ export const analyzeCircularController = async (
       circData.oggetto || ""
     );
 
-    const rettifica = isRettifica(oggetto);
+    const rettifica =
+      isRettifica(oggetto);
 
     console.log(
       `📝 È una rettifica? ${rettifica}`
     );
 
-    let existingCircular: any = null;
-    let eventsToDelete: string[] = [];
-    let relevantCirculars: any[] = [];
+    let existingCircular: any =
+      null;
+
+    let eventsToDelete: string[] =
+      [];
+
+    let relevantCirculars: any[] =
+      [];
 
     // ============================================================
     // 6. GESTIONE RETTIFICHE
@@ -271,7 +326,8 @@ export const analyzeCircularController = async (
               OR: [
                 {
                   subject: {
-                    contains: monthYear.month,
+                    contains:
+                      monthYear.month,
                     mode: "insensitive",
                   },
                 },
@@ -284,7 +340,8 @@ export const analyzeCircularController = async (
                 },
                 {
                   subject: {
-                    contains: "Scrutini",
+                    contains:
+                      "Scrutini",
                     mode: "insensitive",
                   },
                 },
@@ -293,22 +350,27 @@ export const analyzeCircularController = async (
           });
 
         relevantCirculars =
-          similarCirculars.filter((circ) => {
-            const circMonthYear =
-              extractMonthYear(
-                circ.subject
+          similarCirculars.filter(
+            (circ) => {
+              const circMonthYear =
+                extractMonthYear(
+                  circ.subject
+                );
+
+              return (
+                circMonthYear &&
+                circMonthYear.month ===
+                  monthYear.month &&
+                circMonthYear.year ===
+                  monthYear.year
               );
+            }
+          );
 
-            return (
-              circMonthYear &&
-              circMonthYear.month ===
-                monthYear.month &&
-              circMonthYear.year ===
-                monthYear.year
-            );
-          });
-
-        if (relevantCirculars.length > 0) {
+        if (
+          relevantCirculars.length >
+          0
+        ) {
           console.log(
             `📋 Trovate ${relevantCirculars.length} circolari da sostituire`
           );
@@ -317,14 +379,16 @@ export const analyzeCircularController = async (
             eventsToDelete =
               eventsToDelete.concat(
                 circ.events.map(
-                  (e: any) => e.id
+                  (e: any) =>
+                    e.id
                 )
               );
           }
 
           existingCircular =
             relevantCirculars[
-              relevantCirculars.length - 1
+              relevantCirculars.length -
+                1
             ];
         }
       }
@@ -332,8 +396,10 @@ export const analyzeCircularController = async (
       existingCircular =
         await prisma.circular.findFirst({
           where: {
-            number: numeroCircolare,
-            date: dataCircolare,
+            number:
+              numeroCircolare,
+            date:
+              dataCircolare,
           },
           include: {
             events: true,
@@ -345,7 +411,9 @@ export const analyzeCircularController = async (
     // 7. CANCELLA EVENTI DELLE VECCHIE RETTIFICHE
     // ============================================================
 
-    if (eventsToDelete.length > 0) {
+    if (
+      eventsToDelete.length > 0
+    ) {
       console.log(
         `🗑️ Cancello ${eventsToDelete.length} eventi vecchi`
       );
@@ -358,7 +426,10 @@ export const analyzeCircularController = async (
         },
       });
 
-      if (relevantCirculars.length > 0) {
+      if (
+        relevantCirculars.length >
+        0
+      ) {
         await prisma.circular.deleteMany({
           where: {
             id: {
@@ -375,7 +446,10 @@ export const analyzeCircularController = async (
     // 8. AGGIORNAMENTO CIRCOLARE ESISTENTE
     // ============================================================
 
-    if (existingCircular && !rettifica) {
+    if (
+      existingCircular &&
+      !rettifica
+    ) {
       await prisma.event.deleteMany({
         where: {
           circularId:
@@ -388,15 +462,21 @@ export const analyzeCircularController = async (
           where: {
             id: existingCircular.id,
           },
+
           data: {
             fileName:
               fileName ||
               uploadedFile.originalname ||
               existingCircular.fileName,
 
-            filePath: filePath,
+            // Manteniamo il campo per compatibilità,
+            // ma NON viene utilizzato per recuperare il PDF.
+            filePath:
+              existingCircular.filePath,
 
-            fileData: fileData,
+            // ⭐ PDF NEL DATABASE
+            fileData:
+              fileData,
 
             subject:
               oggetto ||
@@ -404,7 +484,9 @@ export const analyzeCircularController = async (
 
             summary:
               orderOfDay.length > 0
-                ? orderOfDay.join("\n")
+                ? orderOfDay.join(
+                    "\n"
+                  )
                 : existingCircular.summary,
 
             text: text,
@@ -415,8 +497,12 @@ export const analyzeCircularController = async (
                   (event: any) => ({
                     title:
                       event.title ||
-                      `${event.classe || "Classe"} - ${
-                        event.sede || "Sede"
+                      `${
+                        event.classe ||
+                        "Classe"
+                      } - ${
+                        event.sede ||
+                        "Sede"
                       }`,
 
                     type:
@@ -424,23 +510,27 @@ export const analyzeCircularController = async (
                       "Consigli di Classe",
 
                     date: String(
-                      event.data || ""
+                      event.data ||
+                        ""
                     ),
 
-                    startTime: String(
-                      event.oraInizio ||
-                        "15:00"
-                    ),
+                    startTime:
+                      String(
+                        event.oraInizio ||
+                          "15:00"
+                      ),
 
-                    endTime: String(
-                      event.oraFine ||
-                        "16:00"
-                    ),
+                    endTime:
+                      String(
+                        event.oraFine ||
+                          "16:00"
+                      ),
 
-                    location: String(
-                      event.sede ||
-                        "Sede scolastica"
-                    ),
+                    location:
+                      String(
+                        event.sede ||
+                          "Sede scolastica"
+                      ),
 
                     circularNumber:
                       numeroCircolare,
@@ -476,9 +566,11 @@ export const analyzeCircularController = async (
             uploadedFile.originalname ||
             "documento.pdf",
 
-          filePath: filePath,
+          // Manteniamo filePath nullo.
+          // Il PDF viene conservato in fileData.
+          filePath: null,
 
-          // ⭐ IL PDF VIENE SALVATO NEL DATABASE
+          // ⭐ PDF SALVATO DIRETTAMENTE IN NEON
           fileData: fileData,
 
           number:
@@ -492,15 +584,18 @@ export const analyzeCircularController = async (
 
           summary:
             orderOfDay.length > 0
-              ? orderOfDay.join("\n")
+              ? orderOfDay.join(
+                  "\n"
+                )
               : "Nessun ordine del giorno",
 
           priority: "media",
 
-          recipients: JSON.stringify(
-            circData.destinatari ||
-              []
-          ),
+          recipients:
+            JSON.stringify(
+              circData.destinatari ||
+                []
+            ),
 
           deadlines:
             JSON.stringify([]),
@@ -515,8 +610,12 @@ export const analyzeCircularController = async (
                 (event: any) => ({
                   title:
                     event.title ||
-                    `${event.classe || "Classe"} - ${
-                      event.sede || "Sede"
+                    `${
+                      event.classe ||
+                      "Classe"
+                    } - ${
+                      event.sede ||
+                      "Sede"
                     }`,
 
                   type:
@@ -524,23 +623,27 @@ export const analyzeCircularController = async (
                     "Consigli di Classe",
 
                   date: String(
-                    event.data || ""
+                    event.data ||
+                      ""
                   ),
 
-                  startTime: String(
-                    event.oraInizio ||
-                      "15:00"
-                  ),
+                  startTime:
+                    String(
+                      event.oraInizio ||
+                        "15:00"
+                    ),
 
-                  endTime: String(
-                    event.oraFine ||
-                      "16:00"
-                  ),
+                  endTime:
+                    String(
+                      event.oraFine ||
+                        "16:00"
+                    ),
 
-                  location: String(
-                    event.sede ||
-                      "Sede scolastica"
-                  ),
+                  location:
+                    String(
+                      event.sede ||
+                        "Sede scolastica"
+                    ),
 
                   circularNumber:
                     numeroCircolare,
@@ -563,14 +666,16 @@ export const analyzeCircularController = async (
       circular.id
     );
 
-    res.json(circular);
+    return res.json(
+      circular
+    );
   } catch (error) {
     console.error(
       "❌ Errore analisi circolare:",
       error
     );
 
-    res.status(500).json({
+    return res.status(500).json({
       error:
         "Errore durante l'analisi AI della circolare",
     });
@@ -581,154 +686,184 @@ export const analyzeCircularController = async (
 // RECUPERA TUTTE LE CIRCOLARI
 // ============================================================
 
-export const getAllCircularsController = async (
-  req: Request,
-  res: Response
-) => {
-  try {
-    const circulars =
-      await prisma.circular.findMany({
-        include: {
-          events: true,
-        },
-        orderBy: {
-          createdAt: "desc",
-        },
+export const getAllCircularsController =
+  async (
+    req: Request,
+    res: Response
+  ) => {
+    try {
+      const circulars =
+        await prisma.circular.findMany({
+          include: {
+            events: true,
+          },
+          orderBy: {
+            createdAt: "desc",
+          },
+        });
+
+      return res.json(
+        circulars
+      );
+    } catch (error) {
+      console.error(
+        "❌ Errore nel recupero delle circolari:",
+        error
+      );
+
+      return res.status(500).json({
+        error:
+          "Errore nel recupero delle circolari",
       });
-
-    res.json(circulars);
-  } catch (error) {
-    console.error(
-      "❌ Errore nel recupero delle circolari:",
-      error
-    );
-
-    res.status(500).json({
-      error:
-        "Errore nel recupero delle circolari",
-    });
-  }
-};
+    }
+  };
 
 // ============================================================
 // APRE IL PDF DIRETTAMENTE DAL DATABASE
 // ============================================================
+//
+// IMPORTANTE:
+// NON cerca più il file in /uploads.
+// NON usa fs.existsSync().
+// NON usa res.sendFile().
+// Legge il Buffer direttamente da Neon tramite fileData.
+// ============================================================
 
-export const getCircularPDFController = async (
-  req: Request,
-  res: Response
-) => {
-  try {
-    const { id } = req.params;
+export const getCircularPDFController =
+  async (
+    req: Request,
+    res: Response
+  ) => {
+    try {
+      const { id } =
+        req.params;
 
-    const circular =
-      await prisma.circular.findUnique({
-        where: {
-          id,
-        },
-        select: {
-          fileName: true,
-          fileData: true,
-        },
-      });
+      const circular =
+        await prisma.circular.findUnique(
+          {
+            where: {
+              id,
+            },
 
-    if (!circular) {
-      return res.status(404).json({
-        error: "Circolare non trovata",
-      });
-    }
+            select: {
+              fileName: true,
+              fileData: true,
+            },
+          }
+        );
 
-    if (!circular.fileData) {
-      return res.status(404).json({
+      if (!circular) {
+        return res.status(404).json({
+          error:
+            "Circolare non trovata",
+        });
+      }
+
+      if (!circular.fileData) {
+        return res.status(404).json({
+          error:
+            "PDF non disponibile nel database",
+        });
+      }
+
+      const safeFileName =
+        (
+          circular.fileName ||
+          "documento.pdf"
+        ).replace(
+          /[^a-zA-Z0-9._-]/g,
+          "_"
+        );
+
+      res.setHeader(
+        "Content-Type",
+        "application/pdf"
+      );
+
+      res.setHeader(
+        "Content-Disposition",
+        `inline; filename="${safeFileName}"`
+      );
+
+      // ⭐ INVIA IL PDF DIRETTAMENTE DAL DATABASE
+      return res.send(
+        circular.fileData
+      );
+    } catch (error) {
+      console.error(
+        "❌ Errore nel recupero del PDF dal database:",
+        error
+      );
+
+      return res.status(500).json({
         error:
-          "PDF non disponibile per questa circolare",
+          "Errore durante il recupero del PDF",
       });
     }
-
-    const safeFileName =
-      circular.fileName
-        .replace(/[^a-zA-Z0-9._-]/g, "_");
-
-    res.setHeader(
-      "Content-Type",
-      "application/pdf"
-    );
-
-    res.setHeader(
-      "Content-Disposition",
-      `inline; filename="${safeFileName}"`
-    );
-
-    res.send(circular.fileData);
-  } catch (error) {
-    console.error(
-      "❌ Errore nel recupero del PDF:",
-      error
-    );
-
-    res.status(500).json({
-      error:
-        "Errore durante il recupero del PDF",
-    });
-  }
-};
+  };
 
 // ============================================================
 // ELIMINA CIRCOLARE
 // ============================================================
 
-export const deleteCircularController = async (
-  req: Request,
-  res: Response
-) => {
-  try {
-    const { id } = req.params;
+export const deleteCircularController =
+  async (
+    req: Request,
+    res: Response
+  ) => {
+    try {
+      const { id } =
+        req.params;
 
-    const circular =
-      await prisma.circular.findUnique({
+      const circular =
+        await prisma.circular.findUnique(
+          {
+            where: {
+              id,
+            },
+
+            include: {
+              events: true,
+            },
+          }
+        );
+
+      if (!circular) {
+        return res.status(404).json({
+          error:
+            "Circolare non trovata",
+        });
+      }
+
+      await prisma.event.deleteMany({
+        where: {
+          circularId: id,
+        },
+      });
+
+      await prisma.circular.delete({
         where: {
           id,
         },
-        include: {
-          events: true,
-        },
       });
 
-    if (!circular) {
-      return res.status(404).json({
-        error: "Circolare non trovata",
+      console.log(
+        `✅ Circolare eliminata con successo. ID: ${id}`
+      );
+
+      return res.json({
+        message:
+          "Circolare eliminata con successo",
+      });
+    } catch (error) {
+      console.error(
+        "❌ Errore nell'eliminazione della circolare:",
+        error
+      );
+
+      return res.status(500).json({
+        error:
+          "Errore nell'eliminazione della circolare",
       });
     }
-
-    await prisma.event.deleteMany({
-      where: {
-        circularId: id,
-      },
-    });
-
-    await prisma.circular.delete({
-      where: {
-        id,
-      },
-    });
-
-    console.log(
-      `✅ Circolare eliminata con successo. ID: ${id}`
-    );
-
-    res.json({
-      message:
-        "Circolare eliminata con successo",
-    });
-  } catch (error) {
-    console.error(
-      "❌ Errore nell'eliminazione della circolare:",
-      error
-    );
-
-    res.status(500).json({
-      error:
-        "Errore durante l'eliminazione della circolare",
-    });
-  }
-};
+  };
