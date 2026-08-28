@@ -11,7 +11,7 @@ model User {
   id        String     @id @default(cuid())
   email     String     @unique
   name      String?
-  classes   String[]   // <-- AGGIUNGI QUESTA RIGA
+  classes   String[]
   circulars Circular[]
   createdAt DateTime   @default(now())
   updatedAt DateTime   @updatedAt
@@ -21,6 +21,7 @@ model Circular {
   id          String   @id @default(cuid())
   fileName    String
   filePath    String?
+  fileData    Bytes?
   number      String
   date        String
   subject     String
