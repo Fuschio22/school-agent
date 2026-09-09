@@ -38,7 +38,7 @@ model Circular {
 }
 
 model Event {
-  id             String   @id @default(cuid())
+  id             String     @id @default(cuid())
   title          String
   type           String
   date           String
@@ -46,8 +46,8 @@ model Event {
   endTime        String
   location       String
   circularNumber String?
-  circularId     String
-  circular       Circular @relation(fields: [circularId], references: [id], onDelete: Cascade)
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  circularId     String?
+  circular       Circular?  @relation(fields: [circularId], references: [id], onDelete: Cascade)
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
 }

@@ -7,6 +7,7 @@ import fs from "fs";
 import circularRoutes from "./routes/circularRoutes";
 import chatRoutes from "./routes/chatRoutes";
 import userRoutes from "./routes/userRoutes";
+import eventRoutes from "./routes/eventRoutes";
 
 dotenv.config();
 
@@ -53,9 +54,11 @@ app.get("/debug/uploads/:filename", (req, res) => {
   });
 });
 
+// API
 app.use("/api/circulars", circularRoutes);
 app.use("/api/chat", chatRoutes);
 app.use("/api/users", userRoutes);
+app.use("/api/events", eventRoutes);
 
 app.listen(PORT, () => {
   console.log(`✅ Backend attivo su http://localhost:${PORT}`);
