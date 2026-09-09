@@ -46,10 +46,19 @@ const getSchoolYearRange = (schoolYear: string) => {
 };
 
 // ✅ Helper: verifica se un evento appartiene all'anno scolastico selezionato
+const parseEventDate = (date: string) => {
+  if (date.includes("-")) {
+    const [year, month, day] = date.split("-").map(Number);
+    return new Date(year, month - 1, day);
+  }
+
+  const [day, month, year] = date.split("/").map(Number);
+  return new Date(year, month - 1, day);
+};
+
 const isEventInSchoolYear = (event: Event, schoolYear: string) => {
   const { startDate, endDate } = getSchoolYearRange(schoolYear);
-  const [day, month, year] = event.date.split("/").map(Number);
-  const eventDate = new Date(year, month - 1, day);
+  const eventDate = parseEventDate(event.date);
   return eventDate >= startDate && eventDate <= endDate;
 };
 
@@ -155,8 +164,10 @@ export default function Hours() {
     const schoolYearEvents = events.filter(event => isEventInSchoolYear(event, selectedSchoolYear));
 
     schoolYearEvents.forEach(event => {
-      const [, month, year] = event.date.split('/');
-      const monthKey = `${year}-${month.padStart(2, '0')}`;
+      const eventDate = parseEventDate(event.date);
+      const year = eventDate.getFullYear();
+      const month = String(eventDate.getMonth() + 1).padStart(2, "0");
+      const monthKey = `${year}-${month}`;
       
       if (monthsMap[monthKey]) {
         monthsMap[monthKey].events.push(event);
