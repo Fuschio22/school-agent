@@ -30,10 +30,19 @@ const getSchoolYearRange = (schoolYear: string) => {
 };
 
 // ✅ Helper: verifica se un evento appartiene all'anno scolastico selezionato
+const parseEventDate = (date: string) => {
+  if (date.includes("-")) {
+    const [year, month, day] = date.split("-").map(Number);
+    return new Date(year, month - 1, day);
+  }
+
+  const [day, month, year] = date.split("/").map(Number);
+  return new Date(year, month - 1, day);
+};
+
 const isEventInSchoolYear = (event: Event, schoolYear: string) => {
   const { startDate, endDate } = getSchoolYearRange(schoolYear);
-  const [day, month, year] = event.date.split("/").map(Number);
-  const eventDate = new Date(year, month - 1, day);
+  const eventDate = parseEventDate(event.date);
   return eventDate >= startDate && eventDate <= endDate;
 };
 
@@ -187,13 +196,12 @@ export default function Dashboard() {
   const today = new Date();
   const upcomingEvents = filteredEvents
     .filter(event => {
-      const [day, month, year] = event.date.split("/").map(Number);
-      const eventDate = new Date(year, month - 1, day);
+      const eventDate = parseEventDate(event.date);
       return eventDate >= today;
     })
     .sort((a, b) => {
-      const dateA = new Date(a.date.split('/').reverse().join('-'));
-      const dateB = new Date(b.date.split('/').reverse().join('-'));
+      const dateA = parseEventDate(a.date);
+      const dateB = parseEventDate(b.date);
       return dateA.getTime() - dateB.getTime();
     })
     .slice(0, 5);
