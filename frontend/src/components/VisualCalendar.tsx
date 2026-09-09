@@ -218,7 +218,6 @@ export default function VisualCalendar({
         );
 
         setIsModalOpen(false);
-
         setEditingIndex(-1);
 
         if (onEventUpdated) {
@@ -234,6 +233,70 @@ export default function VisualCalendar({
           `❌ Errore: ${
             err.error ||
             "Impossibile aggiornare l'evento"
+          }`
+        );
+      }
+    } catch (error) {
+      console.error(
+        "Errore di rete:",
+        error
+      );
+
+      alert(
+        "❌ Errore di connessione al server"
+      );
+    }
+  };
+
+  // ============================================================
+  // ELIMINA SINGOLO EVENTO
+  // ============================================================
+
+  const handleDelete = async (
+    event: Event,
+    originalIndex: number
+  ) => {
+    if (!circularId) {
+      alert(
+        "❌ Errore: ID circolare non trovato"
+      );
+      return;
+    }
+
+    const confirmed = window.confirm(
+      `Vuoi eliminare questo evento?\n\n${event.title}\n📅 ${formatDateForDisplay(event.date)}\n🕒 ${event.startTime} - ${event.endTime}`
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      const response = await fetch(
+        `https://school-agent-backend.onrender.com/api/circulars/${circularId}/events/${originalIndex}`,
+        {
+          method: "DELETE",
+        }
+      );
+
+      if (response.ok) {
+        alert(
+          "✅ Evento eliminato con successo!"
+        );
+
+        if (onEventUpdated) {
+          onEventUpdated();
+        }
+      } else {
+        const err =
+          await response
+            .json()
+            .catch(() => ({}));
+
+        alert(
+          `❌ Errore: ${
+            err.error ||
+            "Impossibile eliminare l'evento"
           }`
         );
       }
@@ -324,18 +387,39 @@ export default function VisualCalendar({
 
             </div>
 
-            <button
-              onClick={() =>
-                handleEditClick(
-                  event,
-                  originalIndex
-                )
-              }
-              className="ml-4 text-blue-600 hover:text-blue-800 hover:bg-blue-100 p-2 rounded-lg transition-colors"
-              title="Modifica questo evento"
-            >
-              ✏️ Modifica
-            </button>
+            {/* ================================================== */}
+            {/* PULSANTI MODIFICA / ELIMINA                       */}
+            {/* ================================================== */}
+
+            <div className="ml-4 flex items-center gap-2 flex-wrap">
+
+              <button
+                onClick={() =>
+                  handleEditClick(
+                    event,
+                    originalIndex
+                  )
+                }
+                className="text-blue-600 hover:text-blue-800 hover:bg-blue-100 p-2 rounded-lg transition-colors"
+                title="Modifica questo evento"
+              >
+                ✏️ Modifica
+              </button>
+
+              <button
+                onClick={() =>
+                  handleDelete(
+                    event,
+                    originalIndex
+                  )
+                }
+                className="text-red-600 hover:text-red-800 hover:bg-red-100 p-2 rounded-lg transition-colors"
+                title="Elimina questo evento"
+              >
+                🗑️ Elimina
+              </button>
+
+            </div>
 
           </div>
         )

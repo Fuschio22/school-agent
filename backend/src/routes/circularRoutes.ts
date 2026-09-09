@@ -9,7 +9,10 @@ import {
   deleteCircularController
 } from "../controllers/circularController";
 
-import { updateEvent } from "../controllers/eventController";
+import {
+  updateEvent,
+  deleteEvent
+} from "../controllers/eventController";
 
 const router = Router();
 
@@ -50,7 +53,10 @@ router.post("/analyze", upload.single("pdf"), analyzeCircularController);
 
 router.delete("/:id", deleteCircularController);
 
-// Il parametro si chiama eventIndex, così il controller lo legge correttamente
+// Modifica un singolo evento
 router.patch("/:circularId/events/:eventIndex", updateEvent);
+
+// Elimina un singolo evento
+router.delete("/:circularId/events/:eventIndex", deleteEvent);
 
 export default router;
