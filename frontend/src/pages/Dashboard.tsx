@@ -59,7 +59,7 @@ export default function Dashboard() {
   const [circulars, setCirculars] = useState<Circular[]>([]);
   const [events, setEvents] = useState<Event[]>([]);
   const [loading, setLoading] = useState(true);
-  
+
   // ✅ Selettore Anno Scolastico
   const [selectedSchoolYear, setSelectedSchoolYear] = useState(() => {
     return localStorage.getItem("selectedSchoolYear") || "2025/2026";
@@ -71,10 +71,10 @@ export default function Dashboard() {
         // ✅ CACHE-BUSTER: Aggiunge un timestamp per forzare il browser a scaricare dati freschi
         const response = await fetch(`${BACKEND_URL}/api/circulars?t=${Date.now()}`);
         const data = await response.json();
-        
+
         console.log("📊 DEBUG Dashboard - Circolari totali dal backend:", data.length);
         setCirculars(data);
-        
+
         const allEvents: Event[] = [];
         data.forEach((circular: Circular) => {
           if (circular.events) {
@@ -83,7 +83,7 @@ export default function Dashboard() {
             });
           }
         });
-        
+
         console.log("📊 DEBUG Dashboard - Eventi totali dal backend:", allEvents.length);
         setEvents(allEvents);
       } catch (error) {
@@ -137,23 +137,23 @@ export default function Dashboard() {
   // ✅ FILTRI FLESSIBILI (sugli eventi filtrati per anno)
   const cdcEvents = filteredEvents.filter(e => e.type.toLowerCase().includes("consiglio") || e.title.toLowerCase().includes("consiglio"));
   const cdcMinutes = calculateMinutes(cdcEvents);
-  
+
   const collegiEvents = filteredEvents.filter(e => e.type.toLowerCase().includes("collegio") || e.title.toLowerCase().includes("collegio"));
   const collegiMinutes = calculateMinutes(collegiEvents);
-  
+
   const dipartimentiEvents = filteredEvents.filter(e => e.type.toLowerCase().includes("dipartiment") || e.title.toLowerCase().includes("dipartiment"));
   const dipartimentiMinutes = calculateMinutes(dipartimentiEvents);
-  
-  const gloEvents = filteredEvents.filter(e => 
-    e.type.toLowerCase().includes("glo") || 
+
+  const gloEvents = filteredEvents.filter(e =>
+    e.type.toLowerCase().includes("glo") ||
     e.title.toLowerCase().includes("glo") ||
     e.type.toLowerCase().includes("gruppo di lavoro") ||
     e.title.toLowerCase().includes("gruppo di lavoro")
   );
   const gloMinutes = calculateMinutes(gloEvents);
-  
-  const colloquiEvents = filteredEvents.filter(e => 
-    e.type.toLowerCase().includes("colloquio") || 
+
+  const colloquiEvents = filteredEvents.filter(e =>
+    e.type.toLowerCase().includes("colloquio") ||
     e.title.toLowerCase().includes("colloquio") ||
     e.type.toLowerCase().includes("riceviment") ||
     e.title.toLowerCase().includes("riceviment") ||
@@ -167,11 +167,11 @@ export default function Dashboard() {
   const currentCCNLMinutes = cdcMinutes + gloMinutes;
   const remainingMinutes = TARGET_CCNL_MINUTES - currentCCNLMinutes;
   const percentageCCNL = Math.round((currentCCNLMinutes / TARGET_CCNL_MINUTES) * 100);
-  
+
   let alertType = "info";
   let alertMessage = "";
   let alertIcon = "";
-  
+
   if (remainingMinutes > 120) {
     alertType = "info";
     alertMessage = `Mancano ${formatHours(remainingMinutes)} per raggiungere l'obbligo CCNL`;
@@ -192,7 +192,7 @@ export default function Dashboard() {
 
   const totalCirculars = filteredCirculars.length;
   const totalEvents = filteredEvents.length;
-  
+
   const today = new Date();
   const upcomingEvents = filteredEvents
     .filter(event => {
@@ -228,10 +228,15 @@ export default function Dashboard() {
         <div>
           <h1 className="text-4xl font-bold">Dashboard</h1>
           <p className="mt-2 text-slate-400">
-            Benvenuto in SchoolAgent - {new Date().toLocaleDateString('it-IT', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+            Benvenuto in SchoolAgent - {new Date().toLocaleDateString('it-IT', {
+              weekday: 'long',
+              year: 'numeric',
+              month: 'long',
+              day: 'numeric'
+            })}
           </p>
         </div>
-        
+
         {/* ✅ SELETTORE ANNO SCOLASTICO */}
         <div className="flex items-center gap-3">
           <label className="text-sm text-slate-400 font-medium">Anno Scolastico:</label>
@@ -257,7 +262,9 @@ export default function Dashboard() {
         <div className="flex items-start gap-4">
           <div className="text-4xl">{alertIcon}</div>
           <div className="flex-1">
-            <h2 className="text-xl font-bold text-white mb-2">Stato Obblighi CCNL (CDC + GLO) - A.S. {selectedSchoolYear}</h2>
+            <h2 className="text-xl font-bold text-white mb-2">
+              Stato Obblighi CCNL (CDC + GLO) - A.S. {selectedSchoolYear}
+            </h2>
             <p className={`text-lg font-semibold ${
               alertType === "info" ? "text-blue-400" :
               alertType === "warning" ? "text-yellow-400" :
@@ -275,9 +282,9 @@ export default function Dashboard() {
             </div>
           </div>
         </div>
-        
+
         <div className="mt-4 w-full bg-slate-800 rounded-full h-3 overflow-hidden">
-          <div 
+          <div
             className={`h-3 rounded-full transition-all duration-500 ${
               alertType === "info" ? "bg-blue-500" :
               alertType === "warning" ? "bg-yellow-500" :
@@ -405,10 +412,10 @@ export default function Dashboard() {
                 <div key={event.id} className="flex items-center justify-between p-4 bg-slate-800 rounded-lg border border-slate-700">
                   <div className="flex items-center gap-4">
                     <div className="text-2xl">
-                      {event.type.toLowerCase().includes("consiglio") ? "👥" : 
-                       event.type.toLowerCase().includes("collegio") ? "🏛️" : 
-                       event.type.toLowerCase().includes("glo") ? "🤝" : 
-                       event.type.toLowerCase().includes("dipartiment") ? "📚" : 
+                      {event.type.toLowerCase().includes("consiglio") ? "👥" :
+                       event.type.toLowerCase().includes("collegio") ? "🏛️" :
+                       event.type.toLowerCase().includes("glo") ? "🤝" :
+                       event.type.toLowerCase().includes("dipartiment") ? "📚" :
                        event.type.toLowerCase().includes("colloquio") || event.type.toLowerCase().includes("famiglia") ? "💬" : "📅"}
                     </div>
                     <div>
@@ -416,9 +423,17 @@ export default function Dashboard() {
                       <p className="text-sm text-slate-400">{event.type}</p>
                     </div>
                   </div>
+
                   <div className="text-right">
-                    <p className="font-semibold text-blue-400">{event.date}</p>
-                    <p className="text-sm text-slate-400">{event.startTime} - {event.endTime}</p>
+                    <p className="font-semibold text-blue-400">
+                      {(() => {
+                        const date = parseEventDate(event.date);
+                        return `${String(date.getDate()).padStart(2, "0")}/${String(date.getMonth() + 1).padStart(2, "0")}/${date.getFullYear()}`;
+                      })()}
+                    </p>
+                    <p className="text-sm text-slate-400">
+                      {event.startTime} - {event.endTime}
+                    </p>
                   </div>
                 </div>
               ))}
@@ -437,17 +452,20 @@ export default function Dashboard() {
                 <p className="text-sm text-slate-400 mb-1">Numero</p>
                 <p className="text-xl font-bold text-white">{lastCircular.number}</p>
               </div>
+
               <div className="p-4 bg-slate-800 rounded-lg border border-slate-700">
                 <p className="text-sm text-slate-400 mb-1">Data</p>
                 <p className="text-lg font-semibold text-white">{lastCircular.date}</p>
               </div>
+
               <div className="p-4 bg-slate-800 rounded-lg border border-slate-700">
                 <p className="text-sm text-slate-400 mb-1">Oggetto</p>
                 <p className="text-sm text-white line-clamp-3">{lastCircular.subject}</p>
               </div>
+
               <div className="p-4 bg-blue-600/20 rounded-lg border border-blue-600/30">
                 <p className="text-sm text-blue-300">
-                   {lastCircular.events?.length || 0} eventi estratti
+                  {lastCircular.events?.length || 0} eventi estratti
                 </p>
               </div>
             </div>
