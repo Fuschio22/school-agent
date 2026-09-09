@@ -51,12 +51,8 @@ const normalizeDateForInput = (date: string): string => {
 
   if (!isNaN(parsed.getTime())) {
     const year = parsed.getFullYear();
-    const month = String(
-      parsed.getMonth() + 1
-    ).padStart(2, "0");
-    const day = String(
-      parsed.getDate()
-    ).padStart(2, "0");
+    const month = String(parsed.getMonth() + 1).padStart(2, "0");
+    const day = String(parsed.getDate()).padStart(2, "0");
 
     return `${year}-${month}-${day}`;
   }
@@ -85,12 +81,10 @@ export default function VisualCalendar({
   circularId,
   onEventUpdated,
 }: VisualCalendarProps) {
-  const [isModalOpen, setIsModalOpen] =
-    useState(false);
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
   // Indice dell'evento nell'array ORIGINALE
-  const [editingIndex, setEditingIndex] =
-    useState<number>(-1);
+  const [editingIndex, setEditingIndex] = useState<number>(-1);
 
   const [formData, setFormData] = useState({
     title: "",
@@ -112,17 +106,11 @@ export default function VisualCalendar({
       originalIndex,
     }))
     .sort((a, b) => {
-      if (
-        a.event.startTime <
-        b.event.startTime
-      ) {
+      if (a.event.startTime < b.event.startTime) {
         return -1;
       }
 
-      if (
-        a.event.startTime >
-        b.event.startTime
-      ) {
+      if (a.event.startTime > b.event.startTime) {
         return 1;
       }
 
@@ -142,20 +130,77 @@ export default function VisualCalendar({
     setFormData({
       title: event.title || "",
       type: event.type || "",
-      sede:
-        event.sede ||
-        event.location ||
-        "",
-      date: normalizeDateForInput(
-        event.date
-      ),
-      startTime:
-        event.startTime || "",
-      endTime:
-        event.endTime || "",
+      sede: event.sede || event.location || "",
+      date: normalizeDateForInput(event.date),
+      startTime: event.startTime || "",
+      endTime: event.endTime || "",
     });
 
     setIsModalOpen(true);
+  };
+
+  // ============================================================
+  // ELIMINA SINGOLO EVENTO
+  // ============================================================
+
+  const handleDelete = async (
+    event: Event,
+    originalIndex: number
+  ) => {
+    if (!circularId) {
+      alert("❌ Errore: ID circolare non trovato");
+      return;
+    }
+
+    const confirmed = window.confirm(
+      `⚠️ Vuoi eliminare questo evento?\n\n` +
+      `${event.title}\n` +
+      `📅 ${formatDateForDisplay(event.date)}\n` +
+      `🕒 ${event.startTime} - ${event.endTime}\n\n` +
+      `La circolare resterà comunque nell'archivio.`
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      const response = await fetch(
+        `https://school-agent-backend.onrender.com/api/circulars/${circularId}/events/${originalIndex}`,
+        {
+          method: "DELETE",
+        }
+      );
+
+      if (response.ok) {
+        alert("✅ Evento eliminato con successo!");
+
+        // Aggiorna l'archivio della circolare
+        if (onEventUpdated) {
+          onEventUpdated();
+        }
+      } else {
+        const err = await response
+          .json()
+          .catch(() => ({}));
+
+        alert(
+          `❌ Errore: ${
+            err.error ||
+            "Impossibile eliminare l'evento"
+          }`
+        );
+      }
+    } catch (error) {
+      console.error(
+        "Errore durante l'eliminazione:",
+        error
+      );
+
+      alert(
+        "❌ Errore di connessione al server"
+      );
+    }
   };
 
   // ============================================================
@@ -170,6 +215,7 @@ export default function VisualCalendar({
       alert(
         "❌ Errore: parametri non validi"
       );
+
       return;
     }
 
@@ -233,70 +279,6 @@ export default function VisualCalendar({
           `❌ Errore: ${
             err.error ||
             "Impossibile aggiornare l'evento"
-          }`
-        );
-      }
-    } catch (error) {
-      console.error(
-        "Errore di rete:",
-        error
-      );
-
-      alert(
-        "❌ Errore di connessione al server"
-      );
-    }
-  };
-
-  // ============================================================
-  // ELIMINA SINGOLO EVENTO
-  // ============================================================
-
-  const handleDelete = async (
-    event: Event,
-    originalIndex: number
-  ) => {
-    if (!circularId) {
-      alert(
-        "❌ Errore: ID circolare non trovato"
-      );
-      return;
-    }
-
-    const confirmed = window.confirm(
-      `Vuoi eliminare questo evento?\n\n${event.title}\n📅 ${formatDateForDisplay(event.date)}\n🕒 ${event.startTime} - ${event.endTime}`
-    );
-
-    if (!confirmed) {
-      return;
-    }
-
-    try {
-      const response = await fetch(
-        `https://school-agent-backend.onrender.com/api/circulars/${circularId}/events/${originalIndex}`,
-        {
-          method: "DELETE",
-        }
-      );
-
-      if (response.ok) {
-        alert(
-          "✅ Evento eliminato con successo!"
-        );
-
-        if (onEventUpdated) {
-          onEventUpdated();
-        }
-      } else {
-        const err =
-          await response
-            .json()
-            .catch(() => ({}));
-
-        alert(
-          `❌ Errore: ${
-            err.error ||
-            "Impossibile eliminare l'evento"
           }`
         );
       }
@@ -387,11 +369,11 @@ export default function VisualCalendar({
 
             </div>
 
-            {/* ================================================== */}
-            {/* PULSANTI MODIFICA / ELIMINA                       */}
-            {/* ================================================== */}
+            {/* ================================================= */}
+            {/* PULSANTI MODIFICA / ELIMINA                     */}
+            {/* ================================================= */}
 
-            <div className="ml-4 flex items-center gap-2 flex-wrap">
+            <div className="ml-4 flex items-center gap-2">
 
               <button
                 onClick={() =>
