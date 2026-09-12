@@ -1,5 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 
+const BACKEND_URL =
+  import.meta.env.VITE_BACKEND_URL ||
+  "https://school-agent-backend.onrender.com";
+
 type Lesson = {
   id: string;
   date: string;
@@ -8,18 +12,16 @@ type Lesson = {
   className: string;
   subject: string;
   topic: string;
-  homework: string | null;
-  notes: string | null;
-  recurrenceType: string | null;
-  recurrenceInterval: number | null;
-  recurrenceDays: string | null;
-  recurrenceEndDate: string | null;
-  recurrenceGroupId: string | null;
-  createdAt: string;
-  updatedAt: string;
+  homework?: string | null;
+  notes?: string | null;
+  recurrenceType?: string | null;
+  recurrenceInterval?: number | null;
+  recurrenceDays?: string | null;
+  recurrenceEndDate?: string | null;
+  recurrenceGroupId?: string | null;
 };
 
-type LessonForm = {
+type FormData = {
   date: string;
   startTime: string;
   endTime: string;
@@ -28,47 +30,56 @@ type LessonForm = {
   topic: string;
   homework: string;
   notes: string;
-  recurrenceType: "none" | "daily" | "weekly";
+  recurrenceType: string;
   recurrenceInterval: number;
   recurrenceDays: number[];
   recurrenceEndDate: string;
 };
 
-const BACKEND_URL =
-  import.meta.env.VITE_BACKEND_URL ||
-  "https://school-agent-backend.onrender.com";
-
-const WEEK_DAYS = [
-  { value: 1, short: "Lun", full: "Lunedì" },
-  { value: 2, short: "Mar", full: "Martedì" },
-  { value: 3, short: "Mer", full: "Mercoledì" },
-  { value: 4, short: "Gio", full: "Giovedì" },
-  { value: 5, short: "Ven", full: "Venerdì" },
-  { value: 6, short: "Sab", full: "Sabato" },
-  { value: 0, short: "Dom", full: "Domenica" },
+const DAY_NAMES = [
+  "Lun",
+  "Mar",
+  "Mer",
+  "Gio",
+  "Ven",
+  "Sab",
+  "Dom",
 ];
 
-const START_HOUR = 8;
-const END_HOUR = 19;
+const CALENDAR_START_HOUR = 8;
+const CALENDAR_END_HOUR = 19;
 const SLOT_HEIGHT = 64;
 
-const formatDateInput = (date: Date) => {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
+const pad = (value: number) => String(value).padStart(2, "0");
 
-  return `${year}-${month}-${day}`;
+const formatDateInput = (date: Date) => {
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(
+    date.getDate()
+  )}`;
 };
 
 const parseDate = (date: string) => {
-  const [year, month, day] = date.split("-").map(Number);
-  return new Date(year, month - 1, day);
+  if (!date) return new Date();
+
+  if (/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+    const [year, month, day] = date.split("-").map(Number);
+    return new Date(year, month - 1, day);
+  }
+
+  if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(date)) {
+    const [day, month, year] = date.split("/").map(Number);
+    return new Date(year, month - 1, day);
+  }
+
+  return new Date(date);
 };
 
-const formatDate = (date: string) => {
-  const parsed = parseDate(date);
+const formatDateDisplay = (date: string) => {
+  const value = parseDate(date);
 
-  return parsed.toLocaleDateString("it-IT", {
+  if (Number.isNaN(value.getTime())) return date;
+
+  return value.toLocaleDateString("it-IT", {
     day: "2-digit",
     month: "2-digit",
     year: "numeric",
@@ -77,49 +88,38 @@ const formatDate = (date: string) => {
 
 const getMonday = (date: Date) => {
   const result = new Date(date);
-  const day = result.getDay();
-  const difference = day === 0 ? -6 : 1 - day;
-
-  result.setDate(result.getDate() + difference);
   result.setHours(0, 0, 0, 0);
 
+  const day = result.getDay();
+  const diff = day === 0 ? -6 : 1 - day;
+
+  result.setDate(result.getDate() + diff);
   return result;
 };
 
-const addDays = (date: Date, days: number) => {
-  const result = new Date(date);
-  result.setDate(result.getDate() + days);
-  return result;
-};
+const getWeekDays = (date: Date) => {
+  const monday = getMonday(date);
 
-const formatWeekRange = (monday: Date) => {
-  const sunday = addDays(monday, 6);
-
-  const first = monday.toLocaleDateString("it-IT", {
-    day: "numeric",
-    month: "long",
-    year: "numeric",
+  return Array.from({ length: 7 }, (_, index) => {
+    const day = new Date(monday);
+    day.setDate(monday.getDate() + index);
+    return day;
   });
-
-  const last = sunday.toLocaleDateString("it-IT", {
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-  });
-
-  return `${first} – ${last}`;
 };
 
-const getDayNumber = (date: string) => {
-  return parseDate(date).getDay();
+const formatTime = (minutes: number) => {
+  const hours = Math.floor(minutes / 60);
+  const mins = minutes % 60;
+
+  return `${pad(hours)}:${pad(mins)}`;
 };
 
-const getMinutesFromTime = (time: string) => {
+const timeToMinutes = (time: string) => {
   const [hours, minutes] = time.split(":").map(Number);
   return hours * 60 + minutes;
 };
 
-const emptyForm = (): LessonForm => {
+const createDefaultForm = (): FormData => {
   const today = new Date();
 
   return {
@@ -133,7 +133,7 @@ const emptyForm = (): LessonForm => {
     notes: "",
     recurrenceType: "none",
     recurrenceInterval: 1,
-    recurrenceDays: [today.getDay()],
+    recurrenceDays: [],
     recurrenceEndDate: "",
   };
 };
@@ -141,93 +141,126 @@ const emptyForm = (): LessonForm => {
 export default function Lessons() {
   const [lessons, setLessons] = useState<Lesson[]>([]);
   const [classes, setClasses] = useState<string[]>([]);
-
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
 
-  const [weekStart, setWeekStart] = useState(
-    getMonday(new Date())
-  );
+  const [currentWeek, setCurrentWeek] = useState(new Date());
 
-  const [showForm, setShowForm] = useState(false);
-  const [editingLesson, setEditingLesson] = useState<Lesson | null>(
-    null
-  );
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingLesson, setEditingLesson] = useState<Lesson | null>(null);
 
-  const [form, setForm] = useState<LessonForm>(emptyForm());
+  const [form, setForm] = useState<FormData>(createDefaultForm());
 
-  const loadLessons = async () => {
+  // ============================================================
+  // CARICA CLASSI E LEZIONI
+  // ============================================================
+
+  const loadData = async () => {
     try {
       setLoading(true);
 
-      const response = await fetch(`${BACKEND_URL}/api/lessons`);
+      const [classesResponse, lessonsResponse] = await Promise.all([
+        fetch(`${BACKEND_URL}/api/users/classes?t=${Date.now()}`),
+        fetch(`${BACKEND_URL}/api/lessons?t=${Date.now()}`),
+      ]);
 
-      if (!response.ok) {
-        throw new Error("Errore nel recupero delle lezioni");
+      if (classesResponse.ok) {
+        const classesData = await classesResponse.json();
+
+        if (Array.isArray(classesData)) {
+          setClasses(classesData);
+        } else if (Array.isArray(classesData.classes)) {
+          setClasses(classesData.classes);
+        }
       }
 
-      const data = await response.json();
+      if (lessonsResponse.ok) {
+        const lessonsData = await lessonsResponse.json();
 
-      setLessons(Array.isArray(data) ? data : []);
+        if (Array.isArray(lessonsData)) {
+          setLessons(lessonsData);
+        }
+      }
     } catch (error) {
-      console.error("❌ Errore recupero lezioni:", error);
-      alert("Impossibile recuperare le lezioni.");
+      console.error("Errore nel caricamento delle lezioni:", error);
     } finally {
       setLoading(false);
     }
   };
 
-  const loadClasses = async () => {
-    try {
-      const response = await fetch(
-        `${BACKEND_URL}/api/users/classes`
-      );
-
-      if (!response.ok) {
-        throw new Error("Errore nel recupero delle classi");
-      }
-
-      const data = await response.json();
-
-      if (Array.isArray(data.classes)) {
-        setClasses(data.classes);
-      }
-    } catch (error) {
-      console.error("❌ Errore recupero classi:", error);
-    }
-  };
-
   useEffect(() => {
-    loadLessons();
-    loadClasses();
+    loadData();
   }, []);
 
-  const openNewLesson = (date?: string, startTime?: string) => {
-    const newForm = emptyForm();
+  // ============================================================
+  // SETTIMANA CORRENTE
+  // ============================================================
 
-    if (date) {
-      newForm.date = date;
-      newForm.recurrenceDays = [getDayNumber(date)];
-    }
+  const weekDays = useMemo(
+    () => getWeekDays(currentWeek),
+    [currentWeek]
+  );
 
-    if (startTime) {
-      const [hour] = startTime.split(":").map(Number);
+  const goToPreviousWeek = () => {
+    setCurrentWeek((current) => {
+      const next = new Date(current);
+      next.setDate(next.getDate() - 7);
+      return next;
+    });
+  };
 
-      newForm.startTime = startTime;
+  const goToNextWeek = () => {
+    setCurrentWeek((current) => {
+      const next = new Date(current);
+      next.setDate(next.getDate() + 7);
+      return next;
+    });
+  };
 
-      newForm.endTime = `${String(hour + 1).padStart(2, "0")}:00`;
-    }
+  const goToToday = () => {
+    setCurrentWeek(new Date());
+  };
 
-    if (classes.length > 0) {
-      newForm.className = classes[0];
-    }
+  // ============================================================
+  // APERTURA MODALE
+  // ============================================================
+
+  const openNewLesson = (
+    date?: string,
+    startTime?: string,
+    endTime?: string
+  ) => {
+    const defaultForm = createDefaultForm();
 
     setEditingLesson(null);
-    setForm(newForm);
-    setShowForm(true);
+
+    setForm({
+      ...defaultForm,
+      date: date || defaultForm.date,
+      startTime: startTime || defaultForm.startTime,
+      endTime: endTime || endTime || defaultForm.endTime,
+    });
+
+    setIsModalOpen(true);
   };
 
   const openEditLesson = (lesson: Lesson) => {
+    let recurrenceDays: number[] = [];
+
+    if (lesson.recurrenceDays) {
+      try {
+        const parsed = JSON.parse(lesson.recurrenceDays);
+
+        if (Array.isArray(parsed)) {
+          recurrenceDays = parsed.map(Number);
+        }
+      } catch {
+        recurrenceDays = lesson.recurrenceDays
+          .split(",")
+          .map(Number)
+          .filter((value) => !Number.isNaN(value));
+      }
+    }
+
     setEditingLesson(lesson);
 
     setForm({
@@ -239,67 +272,98 @@ export default function Lessons() {
       topic: lesson.topic,
       homework: lesson.homework || "",
       notes: lesson.notes || "",
-      recurrenceType: "none",
-      recurrenceInterval: 1,
-      recurrenceDays: [getDayNumber(lesson.date)],
-      recurrenceEndDate: "",
+      recurrenceType: lesson.recurrenceType || "none",
+      recurrenceInterval: lesson.recurrenceInterval || 1,
+      recurrenceDays,
+      recurrenceEndDate: lesson.recurrenceEndDate || "",
     });
 
-    setShowForm(true);
+    setIsModalOpen(true);
   };
 
-  const closeForm = () => {
-    if (saving) return;
-
-    setShowForm(false);
+  const closeModal = () => {
+    setIsModalOpen(false);
     setEditingLesson(null);
-    setForm(emptyForm());
   };
+
+  // ============================================================
+  // CAMBIO FORM
+  // ============================================================
 
   const handleChange = (
-    field: keyof LessonForm,
+    field: keyof FormData,
     value: string | number | number[]
   ) => {
-    setForm((previous) => ({
-      ...previous,
+    setForm((current) => ({
+      ...current,
       [field]: value,
     }));
   };
 
   const toggleRecurrenceDay = (day: number) => {
-    setForm((previous) => {
-      const exists = previous.recurrenceDays.includes(day);
+    setForm((current) => {
+      const exists = current.recurrenceDays.includes(day);
 
       return {
-        ...previous,
+        ...current,
         recurrenceDays: exists
-          ? previous.recurrenceDays.filter((item) => item !== day)
-          : [...previous.recurrenceDays, day],
+          ? current.recurrenceDays.filter((item) => item !== day)
+          : [...current.recurrenceDays, day].sort((a, b) => a - b),
       };
     });
   };
 
-  const handleSubmit = async (event: React.FormEvent) => {
+  // ============================================================
+  // CLICK SU UNO SLOT DEL CALENDARIO
+  // ============================================================
+
+  const handleCalendarSlotClick = (
+    day: Date,
+    hour: number
+  ) => {
+    const date = formatDateInput(day);
+    const startTime = `${pad(hour)}:00`;
+    const endTime = `${pad(hour + 1)}:00`;
+
+    openNewLesson(date, startTime, endTime);
+  };
+
+  // ============================================================
+  // SALVATAGGIO
+  // ============================================================
+
+  const handleSubmit = async (
+    event: React.FormEvent
+  ) => {
     event.preventDefault();
 
-    if (
-      !form.date ||
-      !form.startTime ||
-      !form.endTime ||
-      !form.className ||
-      !form.subject.trim() ||
-      !form.topic.trim()
-    ) {
-      alert(
-        "Compila Data, orario, classe, materia e argomento."
-      );
+    if (!form.date) {
+      alert("Inserisci la data.");
       return;
     }
 
-    if (form.endTime <= form.startTime) {
-      alert(
-        "L'ora di fine deve essere successiva all'ora di inizio."
-      );
+    if (!form.startTime || !form.endTime) {
+      alert("Inserisci l'orario di inizio e di fine.");
+      return;
+    }
+
+    if (timeToMinutes(form.endTime) <= timeToMinutes(form.startTime)) {
+      alert("L'orario di fine deve essere successivo all'orario di inizio.");
+      return;
+    }
+
+    if (!form.className) {
+      alert("Seleziona una classe.");
+      return;
+    }
+
+    if (!form.subject.trim()) {
+      alert("Inserisci la materia.");
+      return;
+    }
+
+    if (!form.topic.trim()) {
+      alert("Inserisci l'argomento.");
       return;
     }
 
@@ -315,117 +379,91 @@ export default function Lessons() {
       form.recurrenceType !== "none" &&
       !form.recurrenceEndDate
     ) {
-      alert(
-        "Per una lezione ricorrente indica la data di fine."
-      );
-      return;
-    }
-
-    if (
-      form.recurrenceType !== "none" &&
-      form.recurrenceEndDate &&
-      form.recurrenceEndDate < form.date
-    ) {
-      alert(
-        "La data di fine della ricorrenza non può essere precedente alla data della lezione."
-      );
+      alert("Inserisci la data fino alla quale ripetere la lezione.");
       return;
     }
 
     try {
-      setSaving(true);
+      const payload = {
+        date: form.date,
+        startTime: form.startTime,
+        endTime: form.endTime,
+        className: form.className,
+        subject: form.subject.trim(),
+        topic: form.topic.trim(),
+        homework: form.homework.trim() || null,
+        notes: form.notes.trim() || null,
+        recurrenceType: form.recurrenceType,
+        recurrenceInterval: form.recurrenceInterval,
+        recurrenceDays:
+          form.recurrenceType === "weekly"
+            ? form.recurrenceDays
+            : [],
+        recurrenceEndDate:
+          form.recurrenceType !== "none"
+            ? form.recurrenceEndDate
+            : null,
+      };
+
+      let response: Response;
 
       if (editingLesson) {
-        const response = await fetch(
+        response = await fetch(
           `${BACKEND_URL}/api/lessons/${editingLesson.id}`,
           {
             method: "PATCH",
             headers: {
               "Content-Type": "application/json",
             },
-            body: JSON.stringify({
-              date: form.date,
-              startTime: form.startTime,
-              endTime: form.endTime,
-              className: form.className,
-              subject: form.subject.trim(),
-              topic: form.topic.trim(),
-              homework: form.homework.trim() || null,
-              notes: form.notes.trim() || null,
-            }),
+            body: JSON.stringify(payload),
           }
         );
-
-        if (!response.ok) {
-          const errorData = await response.json().catch(() => null);
-
-          throw new Error(
-            errorData?.error || "Errore durante la modifica"
-          );
-        }
       } else {
-        const response = await fetch(
+        response = await fetch(
           `${BACKEND_URL}/api/lessons`,
           {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
             },
-            body: JSON.stringify({
-              date: form.date,
-              startTime: form.startTime,
-              endTime: form.endTime,
-              className: form.className,
-              subject: form.subject.trim(),
-              topic: form.topic.trim(),
-              homework: form.homework.trim() || null,
-              notes: form.notes.trim() || null,
-              recurrenceType: form.recurrenceType,
-              recurrenceInterval:
-                form.recurrenceType === "none"
-                  ? null
-                  : form.recurrenceInterval,
-              recurrenceDays:
-                form.recurrenceType === "weekly"
-                  ? form.recurrenceDays
-                  : null,
-              recurrenceEndDate:
-                form.recurrenceType === "none"
-                  ? null
-                  : form.recurrenceEndDate,
-            }),
+            body: JSON.stringify(payload),
           }
         );
-
-        if (!response.ok) {
-          const errorData = await response.json().catch(() => null);
-
-          throw new Error(
-            errorData?.error || "Errore durante la creazione"
-          );
-        }
       }
 
-      closeForm();
-      await loadLessons();
+      if (!response.ok) {
+        const errorData = await response
+          .json()
+          .catch(() => ({}));
+
+        throw new Error(
+          errorData.error ||
+            "Errore durante il salvataggio della lezione."
+        );
+      }
+
+      closeModal();
+      await loadData();
     } catch (error) {
-      console.error("❌ Errore salvataggio lezione:", error);
+      console.error("Errore salvataggio lezione:", error);
 
       alert(
         error instanceof Error
           ? error.message
-          : "Errore durante il salvataggio."
+          : "Errore durante il salvataggio della lezione."
       );
-    } finally {
-      setSaving(false);
     }
   };
 
+  // ============================================================
+  // ELIMINA
+  // ============================================================
+
   const handleDelete = async (lesson: Lesson) => {
     const confirmed = window.confirm(
-      `Vuoi eliminare la lezione del ${formatDate(
+      `Vuoi eliminare la lezione di ${lesson.subject} del ${formatDateDisplay(
         lesson.date
-      )} alle ${lesson.startTime}?`
+      )}?`
     );
 
     if (!confirmed) return;
@@ -439,354 +477,375 @@ export default function Lessons() {
       );
 
       if (!response.ok) {
-        const errorData = await response.json().catch(() => null);
-
-        throw new Error(
-          errorData?.error || "Errore durante l'eliminazione"
-        );
+        throw new Error("Errore durante l'eliminazione.");
       }
 
-      await loadLessons();
+      closeModal();
+      await loadData();
     } catch (error) {
-      console.error("❌ Errore eliminazione lezione:", error);
-
-      alert(
-        error instanceof Error
-          ? error.message
-          : "Errore durante l'eliminazione."
-      );
+      console.error("Errore eliminazione lezione:", error);
+      alert("Non è stato possibile eliminare la lezione.");
     }
   };
 
-  const previousWeek = () => {
-    setWeekStart((current) => addDays(current, -7));
+  // ============================================================
+  // LEZIONI DEL GIORNO
+  // ============================================================
+
+  const getLessonsForDay = (day: Date) => {
+    const dateString = formatDateInput(day);
+
+    return lessons
+      .filter((lesson) => {
+        if (/^\d{4}-\d{2}-\d{2}$/.test(lesson.date)) {
+          return lesson.date === dateString;
+        }
+
+        const parsed = parseDate(lesson.date);
+
+        return (
+          formatDateInput(parsed) === dateString
+        );
+      })
+      .sort((a, b) =>
+        a.startTime.localeCompare(b.startTime)
+      );
   };
 
-  const nextWeek = () => {
-    setWeekStart((current) => addDays(current, 7));
+  // ============================================================
+  // POSIZIONE LEZIONE NEL CALENDARIO
+  // ============================================================
+
+  const getLessonStyle = (lesson: Lesson) => {
+    const startMinutes = timeToMinutes(lesson.startTime);
+    const endMinutes = timeToMinutes(lesson.endTime);
+
+    const calendarStartMinutes =
+      CALENDAR_START_HOUR * 60;
+
+    const top =
+      ((startMinutes - calendarStartMinutes) / 60) *
+      SLOT_HEIGHT;
+
+    const height = Math.max(
+      34,
+      ((endMinutes - startMinutes) / 60) *
+        SLOT_HEIGHT
+    );
+
+    return {
+      top: `${top}px`,
+      height: `${height}px`,
+    };
   };
-
-  const goToday = () => {
-    setWeekStart(getMonday(new Date()));
-  };
-
-  const weekDays = useMemo(() => {
-    return WEEK_DAYS.map((day, index) => {
-      const date = addDays(weekStart, index);
-
-      return {
-        ...day,
-        date,
-        dateString: formatDateInput(date),
-      };
-    });
-  }, [weekStart]);
-
-  const lessonsByDay = useMemo(() => {
-    const result: Record<string, Lesson[]> = {};
-
-    weekDays.forEach((day) => {
-      result[day.dateString] = [];
-    });
-
-    lessons.forEach((lesson) => {
-      if (result[lesson.date]) {
-        result[lesson.date].push(lesson);
-      }
-    });
-
-    return result;
-  }, [lessons, weekDays]);
 
   const todayString = formatDateInput(new Date());
 
+  // ============================================================
+  // TITOLO SETTIMANA
+  // ============================================================
+
+  const weekTitle = `${weekDays[0].toLocaleDateString(
+    "it-IT",
+    {
+      day: "numeric",
+      month: "long",
+    }
+  )} – ${weekDays[6].toLocaleDateString(
+    "it-IT",
+    {
+      day: "numeric",
+      month: "long",
+      year: "numeric",
+    }
+  )}`;
+
+  // ============================================================
+  // RENDER
+  // ============================================================
+
   return (
-    <div className="p-6 max-w-[1600px] mx-auto">
+    <div className="min-h-screen bg-slate-950 text-white p-6">
       {/* HEADER */}
-      <div className="flex flex-col xl:flex-row xl:items-center xl:justify-between gap-5 mb-6">
+
+      <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-4xl font-bold mb-2">
+          <h1 className="text-3xl font-bold">
             Lezioni
           </h1>
 
-          <p className="text-slate-400">
-            Il tuo registro personale delle lezioni
+          <p className="text-slate-400 mt-1">
+            Registro personale delle lezioni
           </p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2">
+        <button
+          type="button"
+          onClick={() => openNewLesson()}
+          className="px-4 py-2.5 rounded-lg bg-blue-600 hover:bg-blue-500 transition font-semibold"
+        >
+          + Nuova lezione
+        </button>
+      </div>
+
+      {/* NAVIGAZIONE SETTIMANA */}
+
+      <div className="flex items-center justify-between mb-4 bg-slate-900 border border-slate-800 rounded-xl p-3">
+        <button
+          type="button"
+          onClick={goToPreviousWeek}
+          className="px-3 py-2 rounded-lg hover:bg-slate-800 text-slate-300"
+        >
+          ←
+        </button>
+
+        <div className="flex items-center gap-4">
           <button
             type="button"
-            onClick={goToday}
-            className="px-4 py-2 rounded-lg bg-slate-700 hover:bg-slate-600 text-white transition"
+            onClick={goToToday}
+            className="px-3 py-2 rounded-lg border border-slate-700 hover:bg-slate-800 text-sm"
           >
             Oggi
           </button>
 
-          <button
-            type="button"
-            onClick={previousWeek}
-            className="w-10 h-10 rounded-lg bg-slate-700 hover:bg-slate-600 text-white text-xl transition"
-            title="Settimana precedente"
-          >
-            ‹
-          </button>
-
-          <button
-            type="button"
-            onClick={nextWeek}
-            className="w-10 h-10 rounded-lg bg-slate-700 hover:bg-slate-600 text-white text-xl transition"
-            title="Settimana successiva"
-          >
-            ›
-          </button>
-
-          <button
-            type="button"
-            onClick={() => openNewLesson()}
-            className="px-5 py-3 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-semibold transition"
-          >
-            + Nuova lezione
-          </button>
+          <h2 className="font-semibold capitalize">
+            {weekTitle}
+          </h2>
         </div>
+
+        <button
+          type="button"
+          onClick={goToNextWeek}
+          className="px-3 py-2 rounded-lg hover:bg-slate-800 text-slate-300"
+        >
+          →
+        </button>
       </div>
 
-      {/* WEEK TITLE */}
-      <div className="flex items-center justify-center mb-4">
-        <h2 className="text-xl font-semibold capitalize">
-          {formatWeekRange(weekStart)}
-        </h2>
-      </div>
+      {/* CALENDARIO */}
 
-      {/* CALENDAR */}
-      <div className="bg-slate-800/60 border border-slate-700 rounded-xl overflow-hidden">
-        {/* DAYS HEADER */}
-        <div className="grid grid-cols-[70px_repeat(7,minmax(110px,1fr))] border-b border-slate-700">
-          <div className="border-r border-slate-700" />
+      <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden">
+        {/* INTESTAZIONE GIORNI */}
 
-          {weekDays.map((day) => {
-            const isToday = day.dateString === todayString;
+        <div className="grid grid-cols-[70px_repeat(7,minmax(0,1fr))] border-b border-slate-800">
+          <div className="border-r border-slate-800" />
+
+          {weekDays.map((day, index) => {
+            const dateString = formatDateInput(day);
+            const isToday = dateString === todayString;
 
             return (
               <div
-                key={day.dateString}
-                className={`text-center py-3 border-r border-slate-700 last:border-r-0 ${
-                  isToday ? "bg-blue-500/10" : ""
+                key={dateString}
+                className={`text-center py-3 border-r border-slate-800 last:border-r-0 ${
+                  isToday ? "bg-blue-950/40" : ""
                 }`}
               >
-                <div className="text-xs text-slate-400 uppercase">
-                  {day.short}
+                <div className="text-xs text-slate-500 uppercase">
+                  {DAY_NAMES[index]}
                 </div>
 
                 <div
-                  className={`text-xl font-semibold mt-1 ${
+                  className={`text-lg font-semibold mt-1 ${
                     isToday
                       ? "text-blue-400"
-                      : "text-white"
+                      : "text-slate-200"
                   }`}
                 >
-                  {day.date.getDate()}
+                  {day.getDate()}
                 </div>
               </div>
             );
           })}
         </div>
 
-        {/* CALENDAR BODY */}
-        <div className="overflow-x-auto">
-          <div
-            className="grid grid-cols-[70px_repeat(7,minmax(110px,1fr))]"
-            style={{
-              minWidth: "850px",
-            }}
-          >
-            {/* TIME COLUMN */}
-            <div className="border-r border-slate-700">
-              {Array.from(
-                { length: END_HOUR - START_HOUR },
-                (_, index) => {
-                  const hour = START_HOUR + index;
+        {/* AREA CALENDARIO */}
 
-                  return (
-                    <div
-                      key={hour}
-                      className="relative border-b border-slate-700 text-xs text-slate-500 text-right pr-2"
-                      style={{
-                        height: SLOT_HEIGHT,
-                      }}
-                    >
-                      <span className="absolute -top-2 right-2">
-                        {String(hour).padStart(2, "0")}:00
-                      </span>
-                    </div>
-                  );
-                }
-              )}
-            </div>
+        <div className="grid grid-cols-[70px_repeat(7,minmax(0,1fr))]">
+          {/* COLONNA ORARI */}
 
-            {/* DAYS */}
-            {weekDays.map((day) => {
-              const dayLessons =
-                lessonsByDay[day.dateString] || [];
+          <div className="border-r border-slate-800">
+            {Array.from(
+              {
+                length:
+                  CALENDAR_END_HOUR -
+                  CALENDAR_START_HOUR,
+              },
+              (_, index) => {
+                const hour =
+                  CALENDAR_START_HOUR + index;
 
-              return (
-                <div
-                  key={day.dateString}
-                  className={`relative border-r border-slate-700 last:border-r-0 ${
-                    day.dateString === todayString
-                      ? "bg-blue-500/[0.03]"
-                      : ""
-                  }`}
-                >
-                  {/* HOURLY GRID */}
-                  {Array.from(
-                    {
-                      length: END_HOUR - START_HOUR,
-                    },
-                    (_, index) => {
-                      const hour = START_HOUR + index;
+                return (
+                  <div
+                    key={hour}
+                    className="h-16 border-b border-slate-800 text-xs text-slate-500 text-right pr-2 pt-1"
+                  >
+                    {pad(hour)}:00
+                  </div>
+                );
+              }
+            )}
+          </div>
 
-                      return (
-                        <button
-                          key={hour}
-                          type="button"
-                          onClick={() =>
-                            openNewLesson(
-                              day.dateString,
-                              `${String(hour).padStart(
-                                2,
-                                "0"
-                              )}:00`
-                            )
-                          }
-                          className="absolute left-0 right-0 border-b border-slate-700/80 hover:bg-slate-700/30 transition"
-                          style={{
-                            top: index * SLOT_HEIGHT,
-                            height: SLOT_HEIGHT,
-                          }}
-                          aria-label={`Nuova lezione ${day.full} alle ${hour}:00`}
-                        />
-                      );
-                    }
-                  )}
+          {/* COLONNE GIORNI */}
 
-                  {/* LESSONS */}
-                  {dayLessons.map((lesson) => {
-                    const startMinutes =
-                      getMinutesFromTime(
-                        lesson.startTime
-                      );
+          {weekDays.map((day) => {
+            const dayString = formatDateInput(day);
+            const dayLessons =
+              getLessonsForDay(day);
 
-                    const endMinutes =
-                      getMinutesFromTime(
-                        lesson.endTime
-                      );
+            return (
+              <div
+                key={dayString}
+                className="relative border-r border-slate-800 last:border-r-0"
+                style={{
+                  height: `${
+                    (CALENDAR_END_HOUR -
+                      CALENDAR_START_HOUR) *
+                    SLOT_HEIGHT
+                  }px`,
+                }}
+              >
+                {/* SLOT ORARI */}
 
-                    const top =
-                      ((startMinutes -
-                        START_HOUR * 60) /
-                        60) *
-                      SLOT_HEIGHT;
-
-                    const height = Math.max(
-                      38,
-                      ((endMinutes - startMinutes) /
-                        60) *
-                        SLOT_HEIGHT
-                    );
+                {Array.from(
+                  {
+                    length:
+                      CALENDAR_END_HOUR -
+                      CALENDAR_START_HOUR,
+                  },
+                  (_, index) => {
+                    const hour =
+                      CALENDAR_START_HOUR + index;
 
                     return (
-                      <div
-                        key={lesson.id}
-                        className="absolute left-1 right-1 z-10 rounded-lg bg-blue-600/90 border border-blue-400/40 shadow-lg p-2 text-left overflow-hidden cursor-pointer hover:bg-blue-500 transition"
-                        style={{
-                          top,
-                          height,
-                        }}
+                      <button
+                        key={hour}
+                        type="button"
                         onClick={() =>
-                          openEditLesson(lesson)
+                          handleCalendarSlotClick(
+                            day,
+                            hour
+                          )
                         }
-                        title="Clicca per modificare"
-                      >
-                        <div className="text-xs text-blue-100 font-medium">
-                          {lesson.startTime} –{" "}
-                          {lesson.endTime}
-                        </div>
+                        className="absolute left-0 right-0 h-16 border-b border-slate-800/80 hover:bg-slate-800/40 transition"
+                        style={{
+                          top: `${
+                            index * SLOT_HEIGHT
+                          }px`,
+                        }}
+                        aria-label={`Nuova lezione ${day.toLocaleDateString(
+                          "it-IT"
+                        )} alle ${pad(hour)}:00`}
+                      />
+                    );
+                  }
+                )}
 
-                        <div className="font-semibold text-white text-sm mt-1 truncate">
-                          {lesson.subject}
-                        </div>
+                {/* LEZIONI */}
 
-                        <div className="text-xs text-blue-100 truncate">
-                          {lesson.className}
-                        </div>
+                {dayLessons.map((lesson) => {
+                  const style =
+                    getLessonStyle(lesson);
 
-                        <div className="text-xs text-white/80 truncate mt-1">
+                  return (
+                    <button
+                      key={lesson.id}
+                      type="button"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        openEditLesson(lesson);
+                      }}
+                      className="absolute left-1 right-1 z-10 rounded-lg bg-blue-600/90 hover:bg-blue-500 border border-blue-400/30 text-left p-2 overflow-hidden shadow-lg transition"
+                      style={style}
+                    >
+                      <div className="font-semibold text-xs truncate">
+                        {lesson.subject}
+                      </div>
+
+                      <div className="text-[11px] text-blue-100 truncate mt-0.5">
+                        {lesson.className}
+                      </div>
+
+                      <div className="text-[10px] text-blue-200 mt-1">
+                        {lesson.startTime} –{" "}
+                        {lesson.endTime}
+                      </div>
+
+                      {lesson.topic && (
+                        <div className="text-[10px] text-blue-100 truncate mt-1">
                           {lesson.topic}
                         </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              );
-            })}
-          </div>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            );
+          })}
         </div>
       </div>
 
-      {/* LOADING */}
       {loading && (
-        <div className="text-center text-slate-400 py-6">
+        <div className="text-center text-slate-500 py-6">
           Caricamento lezioni...
         </div>
       )}
 
-      {/* EMPTY */}
-      {!loading && lessons.length === 0 && (
-        <div className="text-center text-slate-500 py-6">
-          Nessuna lezione registrata. Clicca su una fascia
-          oraria oppure su{" "}
-          <strong>+ Nuova lezione</strong>.
-        </div>
-      )}
+      {/* ========================================================
+          MODALE
+         ======================================================== */}
 
-      {/* MODAL */}
-      {showForm && (
-        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4">
-          <div className="w-full max-w-3xl max-h-[90vh] overflow-y-auto bg-slate-800 border border-slate-700 rounded-2xl shadow-2xl">
-            <div className="flex items-center justify-between p-6 border-b border-slate-700">
-              <div>
-                <h2 className="text-2xl font-semibold">
-                  {editingLesson
-                    ? "Modifica lezione"
-                    : "Nuova lezione"}
-                </h2>
+      {isModalOpen && (
+        <div
+          className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) {
+              closeModal();
+            }
+          }}
+          onClick={(event) => {
+            if (event.target === event.currentTarget) {
+              closeModal();
+            }
+          }}
+        >
+          <div
+            className="w-full max-w-3xl max-h-[90vh] overflow-y-auto bg-slate-800 border border-slate-700 rounded-xl shadow-2xl"
+            onMouseDown={(event) =>
+              event.stopPropagation()
+            }
+            onClick={(event) =>
+              event.stopPropagation()
+            }
+          >
+            {/* HEADER MODALE */}
 
-                {editingLesson && (
-                  <p className="text-sm text-slate-400 mt-1">
-                    {formatDate(editingLesson.date)} ·{" "}
-                    {editingLesson.startTime} –{" "}
-                    {editingLesson.endTime}
-                  </p>
-                )}
-              </div>
+            <div className="px-5 py-4 border-b border-slate-700 flex items-center justify-between">
+              <h2 className="text-2xl font-bold">
+                {editingLesson
+                  ? "Modifica lezione"
+                  : "Nuova lezione"}
+              </h2>
 
               <button
                 type="button"
-                onClick={closeForm}
-                disabled={saving}
-                className="text-slate-400 hover:text-white text-2xl"
+                onClick={closeModal}
+                className="text-slate-400 hover:text-white text-xl"
               >
                 ×
               </button>
             </div>
 
+            {/* FORM */}
+
             <form
               onSubmit={handleSubmit}
-              className="p-6"
+              className="p-5 space-y-5"
             >
-              {/* DATA / ORARIO */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-5">
+              {/* DATA + ORARI */}
+
+              <div className="grid grid-cols-3 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-slate-300 mb-2">
                     Data *
@@ -801,8 +860,14 @@ export default function Lessons() {
                         event.target.value
                       )
                     }
+                    onMouseDown={(event) =>
+                      event.stopPropagation()
+                    }
+                    onClick={(event) =>
+                      event.stopPropagation()
+                    }
                     required
-                    className="w-full px-4 py-3 rounded-lg bg-slate-900 border border-slate-700 text-white focus:outline-none focus:border-blue-500"
+                    className="w-full h-12 px-4 rounded-lg bg-slate-900 border border-slate-700 text-white focus:outline-none focus:border-blue-500"
                   />
                 </div>
 
@@ -820,8 +885,14 @@ export default function Lessons() {
                         event.target.value
                       )
                     }
+                    onMouseDown={(event) =>
+                      event.stopPropagation()
+                    }
+                    onClick={(event) =>
+                      event.stopPropagation()
+                    }
                     required
-                    className="w-full px-4 py-3 rounded-lg bg-slate-900 border border-slate-700 text-white focus:outline-none focus:border-blue-500"
+                    className="w-full h-12 px-4 rounded-lg bg-slate-900 border border-slate-700 text-white focus:outline-none focus:border-blue-500"
                   />
                 </div>
 
@@ -839,14 +910,21 @@ export default function Lessons() {
                         event.target.value
                       )
                     }
+                    onMouseDown={(event) =>
+                      event.stopPropagation()
+                    }
+                    onClick={(event) =>
+                      event.stopPropagation()
+                    }
                     required
-                    className="w-full px-4 py-3 rounded-lg bg-slate-900 border border-slate-700 text-white focus:outline-none focus:border-blue-500"
+                    className="w-full h-12 px-4 rounded-lg bg-slate-900 border border-slate-700 text-white focus:outline-none focus:border-blue-500"
                   />
                 </div>
               </div>
 
-              {/* CLASSE / MATERIA */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-5">
+              {/* CLASSE + MATERIA */}
+
+              <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-slate-300 mb-2">
                     Classe *
@@ -861,7 +939,7 @@ export default function Lessons() {
                       )
                     }
                     required
-                    className="w-full px-4 py-3 rounded-lg bg-slate-900 border border-slate-700 text-white focus:outline-none focus:border-blue-500"
+                    className="w-full h-12 px-4 rounded-lg bg-slate-900 border border-slate-700 text-white focus:outline-none focus:border-blue-500"
                   >
                     <option value="">
                       Seleziona classe
@@ -894,13 +972,14 @@ export default function Lessons() {
                     }
                     placeholder="Es. Economia aziendale"
                     required
-                    className="w-full px-4 py-3 rounded-lg bg-slate-900 border border-slate-700 text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
+                    className="w-full h-12 px-4 rounded-lg bg-slate-900 border border-slate-700 text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
                   />
                 </div>
               </div>
 
               {/* ARGOMENTO */}
-              <div className="mb-5">
+
+              <div>
                 <label className="block text-sm font-medium text-slate-300 mb-2">
                   Argomento *
                 </label>
@@ -916,155 +995,142 @@ export default function Lessons() {
                   }
                   placeholder="Es. Il bilancio d'esercizio"
                   required
-                  className="w-full px-4 py-3 rounded-lg bg-slate-900 border border-slate-700 text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
+                  className="w-full h-12 px-4 rounded-lg bg-slate-900 border border-slate-700 text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
                 />
               </div>
 
               {/* RIPETIZIONE */}
-              {!editingLesson && (
-                <div className="border border-slate-700 rounded-xl p-4 mb-5">
-                  <label className="block text-sm font-medium text-slate-300 mb-2">
-                    🔁 Ripeti
-                  </label>
 
-                  <select
-                    value={form.recurrenceType}
-                    onChange={(event) =>
-                      handleChange(
-                        "recurrenceType",
-                        event.target.value
-                      )
-                    }
-                    className="w-full md:w-1/2 px-4 py-3 rounded-lg bg-slate-900 border border-slate-700 text-white focus:outline-none focus:border-blue-500"
-                  >
-                    <option value="none">
-                      Non si ripete
-                    </option>
+              <div className="border border-slate-700 rounded-xl p-4">
+                <div className="text-sm font-semibold text-slate-300 mb-3">
+                  🔁 Ripeti
+                </div>
 
-                    <option value="daily">
-                      Ogni giorno
-                    </option>
+                <select
+                  value={form.recurrenceType}
+                  onChange={(event) =>
+                    handleChange(
+                      "recurrenceType",
+                      event.target.value
+                    )
+                  }
+                  className="w-full max-w-md h-12 px-4 rounded-lg bg-slate-900 border border-slate-700 text-white focus:outline-none focus:border-blue-500"
+                >
+                  <option value="none">
+                    Non si ripete
+                  </option>
 
-                    <option value="weekly">
-                      Ogni settimana
-                    </option>
-                  </select>
+                  <option value="daily">
+                    Ogni giorno
+                  </option>
 
-                  {form.recurrenceType !== "none" && (
-                    <div className="mt-4">
-                      {form.recurrenceType ===
-                        "weekly" && (
-                        <>
-                          <label className="block text-sm text-slate-400 mb-2">
-                            Giorni della settimana
-                          </label>
+                  <option value="weekly">
+                    Ogni settimana
+                  </option>
+                </select>
 
-                          <div className="flex flex-wrap gap-2">
-                            {WEEK_DAYS.map((day) => {
-                              const selected =
-                                form.recurrenceDays.includes(
-                                  day.value
-                                );
+                {form.recurrenceType !== "none" && (
+                  <div className="mt-4 space-y-4">
+                    {/* INTERVALLO */}
 
-                              return (
-                                <button
-                                  key={day.value}
-                                  type="button"
-                                  onClick={() =>
-                                    toggleRecurrenceDay(
-                                      day.value
-                                    )
-                                  }
-                                  className={`px-3 py-2 rounded-lg text-sm font-medium transition ${
-                                    selected
-                                      ? "bg-blue-600 text-white"
-                                      : "bg-slate-700 text-slate-300 hover:bg-slate-600"
-                                  }`}
-                                >
-                                  {day.short}
-                                </button>
-                              );
-                            })}
-                          </div>
+                    <div className="flex items-center gap-3">
+                      <span className="text-sm text-slate-400">
+                        Ripeti ogni
+                      </span>
 
-                          <p className="text-xs text-slate-500 mt-2">
-                            Puoi selezionare più giorni.
-                          </p>
-                        </>
-                      )}
+                      <select
+                        value={form.recurrenceInterval}
+                        onChange={(event) =>
+                          handleChange(
+                            "recurrenceInterval",
+                            Number(event.target.value)
+                          )
+                        }
+                        className="h-10 px-3 rounded-lg bg-slate-900 border border-slate-700 text-white"
+                      >
+                        <option value={1}>1</option>
+                        <option value={2}>2</option>
+                        <option value={3}>3</option>
+                      </select>
 
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
-                        <div>
-                          <label className="block text-sm text-slate-400 mb-2">
-                            Intervallo
-                          </label>
+                      <span className="text-sm text-slate-400">
+                        {form.recurrenceType ===
+                        "daily"
+                          ? "giorno/i"
+                          : "settimana/e"}
+                      </span>
+                    </div>
 
-                          <select
-                            value={
-                              form.recurrenceInterval
-                            }
-                            onChange={(event) =>
-                              handleChange(
-                                "recurrenceInterval",
-                                Number(
-                                  event.target.value
-                                )
-                              )
-                            }
-                            className="w-full px-4 py-3 rounded-lg bg-slate-900 border border-slate-700 text-white focus:outline-none focus:border-blue-500"
-                          >
-                            <option value={1}>
-                              {form.recurrenceType ===
-                              "daily"
-                                ? "Ogni giorno"
-                                : "Ogni settimana"}
-                            </option>
+                    {/* GIORNI SETTIMANA */}
 
-                            <option value={2}>
-                              {form.recurrenceType ===
-                              "daily"
-                                ? "Ogni 2 giorni"
-                                : "Ogni 2 settimane"}
-                            </option>
-
-                            <option value={3}>
-                              {form.recurrenceType ===
-                              "daily"
-                                ? "Ogni 3 giorni"
-                                : "Ogni 3 settimane"}
-                            </option>
-                          </select>
+                    {form.recurrenceType ===
+                      "weekly" && (
+                      <div>
+                        <div className="text-sm text-slate-400 mb-2">
+                          Giorni
                         </div>
 
-                        <div>
-                          <label className="block text-sm text-slate-400 mb-2">
-                            Termina il
-                          </label>
-
-                          <input
-                            type="date"
-                            value={
-                              form.recurrenceEndDate
-                            }
-                            min={form.date}
-                            onChange={(event) =>
-                              handleChange(
-                                "recurrenceEndDate",
-                                event.target.value
-                              )
-                            }
-                            required
-                            className="w-full px-4 py-3 rounded-lg bg-slate-900 border border-slate-700 text-white focus:outline-none focus:border-blue-500"
-                          />
+                        <div className="flex flex-wrap gap-2">
+                          {DAY_NAMES.map(
+                            (name, index) => (
+                              <button
+                                key={name}
+                                type="button"
+                                onClick={() =>
+                                  toggleRecurrenceDay(
+                                    index + 1
+                                  )
+                                }
+                                className={`px-3 py-2 rounded-lg text-sm font-medium border transition ${
+                                  form.recurrenceDays.includes(
+                                    index + 1
+                                  )
+                                    ? "bg-blue-600 border-blue-500 text-white"
+                                    : "bg-slate-900 border-slate-700 text-slate-400 hover:text-white"
+                                }`}
+                              >
+                                {name}
+                              </button>
+                            )
+                          )}
                         </div>
                       </div>
+                    )}
+
+                    {/* DATA FINE RIPETIZIONE */}
+
+                    <div className="max-w-xs">
+                      <label className="block text-sm text-slate-400 mb-2">
+                        Ripeti fino al
+                      </label>
+
+                      <input
+                        type="date"
+                        value={
+                          form.recurrenceEndDate
+                        }
+                        onChange={(event) =>
+                          handleChange(
+                            "recurrenceEndDate",
+                            event.target.value
+                          )
+                        }
+                        onMouseDown={(event) =>
+                          event.stopPropagation()
+                        }
+                        onClick={(event) =>
+                          event.stopPropagation()
+                        }
+                        className="w-full h-11 px-4 rounded-lg bg-slate-900 border border-slate-700 text-white focus:outline-none focus:border-blue-500"
+                      />
                     </div>
-                  )}
-                </div>
-              )}
+                  </div>
+                )}
+              </div>
 
               {/* COMPITI */}
-              <div className="mb-5">
+
+              <div>
                 <label className="block text-sm font-medium text-slate-300 mb-2">
                   📌 Compiti assegnati
                 </label>
@@ -1084,7 +1150,8 @@ export default function Lessons() {
               </div>
 
               {/* NOTE */}
-              <div className="mb-6">
+
+              <div>
                 <label className="block text-sm font-medium text-slate-300 mb-2">
                   📝 Note
                 </label>
@@ -1103,18 +1170,17 @@ export default function Lessons() {
                 />
               </div>
 
-              {/* BUTTONS */}
-              <div className="flex justify-between gap-3">
+              {/* PULSANTI */}
+
+              <div className="flex items-center justify-between pt-3 border-t border-slate-700">
                 <div>
                   {editingLesson && (
                     <button
                       type="button"
-                      onClick={() => {
-                        closeForm();
-                        handleDelete(editingLesson);
-                      }}
-                      disabled={saving}
-                      className="px-5 py-3 rounded-lg bg-red-500/15 hover:bg-red-500/25 text-red-300 font-medium transition"
+                      onClick={() =>
+                        handleDelete(editingLesson)
+                      }
+                      className="px-4 py-2.5 rounded-lg bg-red-600/20 border border-red-500/40 text-red-400 hover:bg-red-600/30"
                     >
                       Elimina
                     </button>
@@ -1124,23 +1190,19 @@ export default function Lessons() {
                 <div className="flex gap-3">
                   <button
                     type="button"
-                    onClick={closeForm}
-                    disabled={saving}
-                    className="px-5 py-3 rounded-lg bg-slate-700 hover:bg-slate-600 text-white font-medium transition"
+                    onClick={closeModal}
+                    className="px-4 py-2.5 rounded-lg bg-slate-700 hover:bg-slate-600 text-white"
                   >
                     Annulla
                   </button>
 
                   <button
                     type="submit"
-                    disabled={saving}
-                    className="px-5 py-3 rounded-lg bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white font-semibold transition"
+                    className="px-5 py-2.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-semibold"
                   >
-                    {saving
-                      ? "Salvataggio..."
-                      : editingLesson
-                        ? "Salva modifiche"
-                        : "Salva lezione"}
+                    {editingLesson
+                      ? "Salva modifiche"
+                      : "Salva lezione"}
                   </button>
                 </div>
               </div>
