@@ -55,17 +55,32 @@ model Event {
 
 model Lesson {
   id        String   @id @default(cuid())
+
   date      String
+  startTime String
+  endTime   String
+
   className String
   subject   String
   topic     String
+
   homework  String?
   notes     String?
+
+  recurrenceType      String?
+  recurrenceInterval  Int?
+  recurrenceDays      String?
+  recurrenceEndDate   String?
+
+  recurrenceGroupId   String?
+
   userId    String
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@index([userId, date])
   @@index([userId, className])
+  @@index([userId, recurrenceGroupId])
 }
