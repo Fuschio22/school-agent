@@ -13,6 +13,7 @@ model User {
   name      String?
   classes   String[]
   circulars Circular[]
+  lessons   Lesson[]
   createdAt DateTime   @default(now())
   updatedAt DateTime   @updatedAt
 }
@@ -50,4 +51,21 @@ model Event {
   circular       Circular?  @relation(fields: [circularId], references: [id], onDelete: Cascade)
   createdAt      DateTime   @default(now())
   updatedAt      DateTime   @updatedAt
+}
+
+model Lesson {
+  id        String   @id @default(cuid())
+  date      String
+  className String
+  subject   String
+  topic     String
+  homework  String?
+  notes     String?
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId, date])
+  @@index([userId, className])
 }
