@@ -1,5 +1,307 @@
 import OpenAI from "openai";
 
+/**
+ * Normalizza una classe dell'IIS Pira.
+ *
+ * Esempi:
+ * 1AS
+ * 1A Liceo Scientifico
+ * 1A LICEO SINISCOLA
+ * 1^A LICEO SINISCOLA
+ * 1^A LICEO SCIENTIFICO SINISCOLA
+ *
+ * diventano tutti:
+ * 1AS
+ *
+ * La stessa logica vale per A/B e per tutte le classi 1-5.
+ */
+function normalizePiraClass(value: unknown): string {
+  if (value === null || value === undefined) {
+    return "";
+  }
+
+  let normalized = String(value)
+    .toUpperCase()
+    .replace(/°/g, "")
+    .replace(/\^/g, "")
+    .replace(/[._-]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  if (!normalized) {
+    return "";
+  }
+
+  /*
+   * Rimuove prefissi molto comuni nei titoli:
+   *
+   * "CONSIGLIO DI CLASSE 1A LICEO SINISCOLA"
+   * "GLO 1^A LICEO SCIENTIFICO"
+   */
+  normalized = normalized
+    .replace(/^CONSIGLIO DI CLASSE\s+/i, "")
+    .replace(/^GLO\s+/i, "")
+    .replace(/^GRUPPO DI LAVORO OPERATIVO\s+/i, "")
+    .trim();
+
+  /*
+   * LICEO SCIENTIFICO SINISCOLA
+   *
+   * Riconosce:
+   * 1A LICEO SCIENTIFICO
+   * 1A LICEO SCIENTIFICO SINISCOLA
+   * 1A LICEO SINISCOLA
+   * 1 A LICEO SINISCOLA
+   * 1^A LICEO SINISCOLA
+   * 1^A LICEO SCIENTIFICO SINISCOLA
+   */
+  const liceoMatch = normalized.match(
+    /^([1-5])\s*(?:A|B)\s+(?:LICEO\s+SCIENTIFICO(?:\s+DI)?(?:\s+SINISCOLA)?|LICEO\s+SINISCOLA)(?:\s+.*)?$/
+  );
+
+  if (liceoMatch) {
+    const number = liceoMatch[1];
+
+    const letterMatch = normalized.match(
+      /^([1-5])\s*(A|B)\s+/
+    );
+
+    if (letterMatch) {
+      return `${number}${letterMatch[2]}S`;
+    }
+  }
+
+  /*
+   * Forma con "^":
+   *
+   * 1^A LICEO SINISCOLA
+   * 2^B LICEO SCIENTIFICO SINISCOLA
+   */
+  const liceoCaretMatch = normalized.match(
+    /^([1-5])\s*(A|B)\s+(?:LICEO\s+SCIENTIFICO|LICEO)\b.*SINISCOLA.*$/
+  );
+
+  if (liceoCaretMatch) {
+    return `${liceoCaretMatch[1]}${liceoCaretMatch[2]}S`;
+  }
+
+  /*
+   * Formato interno già normalizzato:
+   *
+   * 1AS
+   * 2AS
+   * 3BS
+   * ecc.
+   */
+  const shortLiceoMatch = normalized.match(
+    /^([1-5])\s*(A|B)S$/
+  );
+
+  if (shortLiceoMatch) {
+    return `${shortLiceoMatch[1]}${shortLiceoMatch[2]}S`;
+  }
+
+  /*
+   * Varianti:
+   *
+   * 1AS LICEO SCIENTIFICO
+   * 1AS LICEO SINISCOLA
+   */
+  const shortLiceoWithTextMatch = normalized.match(
+    /^([1-5])\s*(A|B)S\s+(?:LICEO|SCIENTIFICO|SINISCOLA).*$/ 
+  );
+
+  if (shortLiceoWithTextMatch) {
+    return `${shortLiceoWithTextMatch[1]}${shortLiceoWithTextMatch[2]}S`;
+  }
+
+  /*
+   * IPSASR
+   *
+   * 4A IPSASR
+   * 4^A IPSASR
+   * 5B IPSASR
+   */
+  const ipsasrMatch = normalized.match(
+    /^([1-5])\s*(A|B)\s+IPSASR\b.*$/
+  );
+
+  if (ipsasrMatch) {
+    return `${ipsasrMatch[1]}${ipsasrMatch[2]} IPSASR`;
+  }
+
+  /*
+   * Se la classe è già nel formato:
+   * 4A IPSASR / 5A IPSASR
+   */
+  if (/^[1-5]\s*[AB]\s+IPSASR$/.test(normalized)) {
+    return normalized.replace(
+      /^([1-5])\s*([AB])\s+IPSASR$/,
+      "$1$2 IPSASR"
+    );
+  }
+
+  /*
+   * Non modifichiamo classi che non possiamo identificare
+   * con certezza.
+   */
+  return String(value).trim();
+}
+
+/**
+ * Restituisce il codice interno normalizzato della classe.
+ */
+function getPiraCanonicalClass(value: unknown): string {
+  const normalized = normalizePiraClass(value);
+
+  if (/^[1-5][AB]S$/.test(normalized)) {
+    return normalized;
+  }
+
+  if (/^[1-5][AB] IPSASR$/.test(normalized)) {
+    return normalized;
+  }
+
+  return normalized;
+}
+
+/**
+ * Normalizza le classi configurate dall'utente.
+ */
+function normalizeUserClasses(
+  userClasses: string[],
+  isPira: boolean
+): string[] {
+  if (!isPira) {
+    return userClasses.map((c) => String(c).trim()).filter(Boolean);
+  }
+
+  return userClasses
+    .map((c) => getPiraCanonicalClass(c))
+    .filter(Boolean);
+}
+
+/**
+ * Cerca una classe Pira dentro una stringa più lunga.
+ *
+ * Serve come ulteriore sicurezza quando l'AI restituisce,
+ * per esempio:
+ *
+ * "Consiglio di Classe 1^A LICEO SINISCOLA"
+ */
+function extractPiraClassFromText(value: unknown): string {
+  if (value === null || value === undefined) {
+    return "";
+  }
+
+  const text = String(value)
+    .toUpperCase()
+    .replace(/°/g, "")
+    .replace(/\^/g, "")
+    .replace(/[._-]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  if (!text) {
+    return "";
+  }
+
+  /*
+   * Liceo Scientifico / Siniscola.
+   */
+  const liceoMatch = text.match(
+    /(?:^|\s)([1-5])\s*(A|B)\s+(?:LICEO\s+SCIENTIFICO(?:\s+DI)?(?:\s+SINISCOLA)?|LICEO\s+SINISCOLA)(?:\s|$)/
+  );
+
+  if (liceoMatch) {
+    return `${liceoMatch[1]}${liceoMatch[2]}S`;
+  }
+
+  /*
+   * Forma 1AS / 1BS.
+   */
+  const shortMatch = text.match(
+    /(?:^|\s)([1-5])\s*(A|B)S(?:\s|$)/
+  );
+
+  if (shortMatch) {
+    return `${shortMatch[1]}${shortMatch[2]}S`;
+  }
+
+  /*
+   * IPSASR.
+   */
+  const ipsasrMatch = text.match(
+    /(?:^|\s)([1-5])\s*(A|B)\s+IPSASR(?:\s|$)/
+  );
+
+  if (ipsasrMatch) {
+    return `${ipsasrMatch[1]}${ipsasrMatch[2]} IPSASR`;
+  }
+
+  return "";
+}
+
+/**
+ * Normalizza gli eventi restituiti dall'AI.
+ *
+ * Questa è la seconda protezione:
+ * anche se Groq restituisce "1^A LICEO SINISCOLA",
+ * nel DB finirà come "1AS".
+ */
+function normalizePiraEvents(events: any[]): any[] {
+  if (!Array.isArray(events)) {
+    return [];
+  }
+
+  return events.map((event) => {
+    const normalizedEvent = {
+      ...event,
+    };
+
+    const classFromField = extractPiraClassFromText(
+      event?.classe
+    );
+
+    const classFromTitle = extractPiraClassFromText(
+      event?.title
+    );
+
+    const canonicalClass =
+      classFromField ||
+      classFromTitle ||
+      normalizePiraClass(event?.classe);
+
+    if (canonicalClass) {
+      normalizedEvent.classe = canonicalClass;
+
+      /*
+       * Per i Consigli di Classe rendiamo il titolo
+       * coerente con la classe normalizzata.
+       */
+      const type = String(event?.type || "").toLowerCase();
+
+      if (
+        type.includes("consiglio di classe") ||
+        type.includes("consigli di classe")
+      ) {
+        normalizedEvent.title =
+          `Consiglio di Classe ${canonicalClass}`;
+      }
+
+      if (
+        type.includes("glo") ||
+        type.includes("gruppi di lavoro operativi")
+      ) {
+        normalizedEvent.title =
+          `GLO ${canonicalClass}`;
+      }
+    }
+
+    return normalizedEvent;
+  });
+}
+
 export async function analyzeCircularText(
   text: string,
   userClasses: string[] = []
@@ -33,86 +335,104 @@ export async function analyzeCircularText(
     schoolContext =
       "\n\n🏫 SCUOLA: CHIRONI-SATTA (Nuoro)\n" +
       `CLASSI RILEVANTI: ${relevantClasses.join(", ")}\n` +
-      "ISTRUZIONE: estrai gli eventi delle classi OR pertinenti alla scuola. " +
-      "Non eliminare eventi generali come Collegi, Dipartimenti o altre riunioni senza classe.";
+      "ISTRUZIONE: Estrai SOLO eventi per queste classi OR. Ignora tutte le altre.";
 
     schoolName = "ITC Chironi-Satta";
   } else if (isPira && !isChironi) {
     /*
-     * Per il Pira utilizziamo tutte le classi effettivamente configurate
-     * dall'utente che possono appartenere alla scuola.
-     *
      * IMPORTANTE:
-     * il Liceo Scientifico di Siniscola può essere scritto nella circolare
-     * in molti modi diversi:
      *
-     * 1^A LICEO SINISCOLA
-     * 1^A LICEO SCIENTIFICO SINISCOLA
-     * 1A LICEO SINISCOLA
-     * 1AS
-     * 1A Liceo Scientifico
+     * Non cerchiamo più semplicemente AS/BS/IPSASR
+     * dentro la stringa originale.
      *
-     * Le classi 1AS-5AS e 1BS-5BS sono quindi esplicitamente incluse.
+     * Prima normalizziamo tutte le classi.
      */
+    const normalizedConfiguredClasses =
+      normalizeUserClasses(userClasses, true);
 
-    relevantClasses = userClasses.filter((c) => {
-      const normalized = c
-        .toUpperCase()
-        .replace(/\s+/g, " ")
-        .trim();
+    relevantClasses = normalizedConfiguredClasses.filter(
+      (c) =>
+        /^[1-5][AB]S$/.test(c) ||
+        /^[1-5][AB] IPSASR$/.test(c)
+    );
 
-      return (
-        normalized.includes("AS") ||
-        normalized.includes("BS") ||
-        normalized.includes("IPSASR") ||
-        normalized.includes("LICEO SCIENTIFICO") ||
-        normalized.includes("LICEO SINISCOLA")
-      );
-    });
+    /*
+     * Se per qualche motivo la configurazione utente
+     * non contiene le classi Liceo ma la circolare
+     * è chiaramente del Liceo di Siniscola, manteniamo
+     * comunque disponibili tutti i codici canonici.
+     */
+    const canonicalLiceoClasses = [
+      "1AS",
+      "2AS",
+      "3AS",
+      "4AS",
+      "5AS",
+      "1BS",
+      "2BS",
+      "3BS",
+      "4BS",
+      "5BS",
+    ];
+
+    for (const classCode of canonicalLiceoClasses) {
+      if (!relevantClasses.includes(classCode)) {
+        relevantClasses.push(classCode);
+      }
+    }
 
     schoolContext =
-      "\n\n🏫 SCUOLA: IIS PIRA - SINISCOLA\n" +
-      `CLASSI CONFIGURATE DALL'UTENTE: ${relevantClasses.join(", ")}\n\n` +
-      "IMPORTANTE: la circolare può utilizzare denominazioni diverse " +
-      "da quelle presenti nelle impostazioni dell'utente.\n\n" +
-      "Per il LICEO SCIENTIFICO DI SINISCOLA devi riconoscere come equivalenti:\n" +
-      "- 1^A LICEO SINISCOLA = 1AS\n" +
-      "- 1^B LICEO SINISCOLA = 1BS\n" +
-      "- 2^A LICEO SINISCOLA = 2AS\n" +
-      "- 2^B LICEO SINISCOLA = 2BS\n" +
-      "- 3^A LICEO SINISCOLA = 3AS\n" +
-      "- 3^B LICEO SINISCOLA = 3BS\n" +
-      "- 4^A LICEO SINISCOLA = 4AS\n" +
-      "- 4^B LICEO SINISCOLA = 4BS\n" +
-      "- 5^A LICEO SINISCOLA = 5AS\n" +
-      "- 5^B LICEO SINISCOLA = 5BS\n\n" +
-      "Sono equivalenti anche forme come '1A LICEO SCIENTIFICO', " +
-      "'1A LICEO SCIENTIFICO SINISCOLA' e '1A LICEO SINISCOLA'.\n\n" +
-      "REGOLA FONDAMENTALE: se nel testo della circolare trovi una tabella " +
-      "con i Consigli di Classe del Liceo Scientifico di Siniscola, " +
-      "DEVI estrarre TUTTI gli eventi delle classi 1A, 1B, 2A, 2B, " +
-      "3A, 3B, 4A, 4B, 5A e 5B presenti nella tabella.\n\n" +
-      "Non fermarti ai primi eventi trovati e non limitarti alle classi IPSASR.\n" +
-      "La presenza di IPSASR non deve impedire l'estrazione degli eventi del Liceo.\n\n" +
-      "Per le classi estratte usa nel campo 'classe' il codice della classe " +
-      "quando è chiaramente riconoscibile, preferibilmente nella forma " +
-      "1AS, 1BS, 2AS, 2BS, 3AS, 3BS, 4AS, 4BS, 5AS, 5BS.\n\n" +
-      "Le classi IPSASR devono invece essere mantenute come 4A IPSASR, " +
-      "5A IPSASR, ecc.\n\n" +
-      "Non eliminare eventi generali come Collegi, Dipartimenti o altre " +
-      "riunioni senza classe.";
+      "\n\n🏫 SCUOLA: IIS PIRA - LICEO SCIENTIFICO DI SINISCOLA\n" +
+      `CLASSI RILEVANTI: ${relevantClasses.join(", ")}\n\n` +
+
+      "NORMALIZZAZIONE OBBLIGATORIA DELLE CLASSI:\n" +
+      "- 1AS = 1A LICEO SCIENTIFICO = 1A LICEO SINISCOLA = 1^A LICEO SINISCOLA = 1^A LICEO SCIENTIFICO SINISCOLA\n" +
+      "- 1BS = 1B LICEO SCIENTIFICO = 1B LICEO SINISCOLA = 1^B LICEO SINISCOLA = 1^B LICEO SCIENTIFICO SINISCOLA\n" +
+      "- 2AS = 2A LICEO SCIENTIFICO = 2A LICEO SINISCOLA = 2^A LICEO SINISCOLA = 2^A LICEO SCIENTIFICO SINISCOLA\n" +
+      "- 2BS = 2B LICEO SCIENTIFICO = 2B LICEO SINISCOLA = 2^B LICEO SINISCOLA = 2^B LICEO SCIENTIFICO SINISCOLA\n" +
+      "- 3AS = 3A LICEO SCIENTIFICO = 3A LICEO SINISCOLA = 3^A LICEO SINISCOLA = 3^A LICEO SCIENTIFICO SINISCOLA\n" +
+      "- 3BS = 3B LICEO SCIENTIFICO = 3B LICEO SINISCOLA = 3^B LICEO SINISCOLA = 3^B LICEO SCIENTIFICO SINISCOLA\n" +
+      "- 4AS = 4A LICEO SCIENTIFICO = 4A LICEO SINISCOLA = 4^A LICEO SINISCOLA = 4^A LICEO SCIENTIFICO SINISCOLA\n" +
+      "- 4BS = 4B LICEO SCIENTIFICO = 4B LICEO SINISCOLA = 4^B LICEO SINISCOLA = 4^B LICEO SCIENTIFICO SINISCOLA\n" +
+      "- 5AS = 5A LICEO SCIENTIFICO = 5A LICEO SINISCOLA = 5^A LICEO SINISCOLA = 5^A LICEO SCIENTIFICO SINISCOLA\n" +
+      "- 5BS = 5B LICEO SCIENTIFICO = 5B LICEO SINISCOLA = 5^B LICEO SINISCOLA = 5^B LICEO SCIENTIFICO SINISCOLA\n" +
+      "- 4A IPSASR e 5A IPSASR devono rimanere distinti dalle classi del Liceo.\n\n" +
+
+      "REGOLE IMPORTANTI PER LE CLASSI DEL LICEO:\n" +
+      "- La dicitura può cambiare da una circolare all'altra.\n" +
+      "- NON usare la forma testuale trovata nel PDF come identificatore interno.\n" +
+      "- Converti sempre le classi del Liceo di Siniscola nel codice canonico 1AS-5AS o 1BS-5BS.\n" +
+      "- Una tabella con intestazione 'LICEO SCIENTIFICO DI SINISCOLA' o 'LICEO SCIENTIFICO SINISCOLA' stabilisce il contesto per tutte le classi presenti sotto quell'intestazione.\n" +
+      "- Per esempio, se trovi '2^B LICEO SINISCOLA', la classe canonica è 2BS.\n" +
+      "- NON ignorare una classe solo perché il suo testo non coincide esattamente con la configurazione dell'utente.\n\n" +
+
+      "ESTRAZIONE DEL LICEO:\n" +
+      "- Devi estrarre TUTTI gli eventi del Liceo Scientifico di Siniscola presenti nella circolare.\n" +
+      "- Non fermarti agli eventi IPSASR.\n" +
+      "- Se una tabella contiene 10 Consigli di Classe del Liceo, devono essere restituiti tutti e 10.\n" +
+      "- Mantieni data, ora di inizio, ora di fine e sede esattamente corrispondenti alla tabella.\n\n" +
+
+      "ISTRUZIONE GENERALE: estrai gli eventi pertinenti al IIS Pira. " +
+      "Gli eventi relativi a classi di altre scuole o sedi non pertinenti devono essere ignorati.";
 
     schoolName = "IIS Pira";
   } else {
     schoolContext =
-      "\n\n⚠️ SCUOLA NON IDENTIFICATA: estrai gli eventi per tutte le classi configurate.";
+      "\n\n⚠️ SCUOLA NON IDENTIFICATA: estrai eventi per tutte le classi configurate.";
 
     schoolName = "Istituto";
   }
 
-  const systemPrompt = `Sei SchoolAgent, un esperto nell'analisi di circolari scolastiche italiane.
+  const response = await openai.chat.completions.create({
+    model: "openai/gpt-oss-120b",
 
-Il tuo compito è leggere attentamente una circolare scolastica e restituire UN SOLO oggetto JSON valido.
+    messages: [
+      {
+        role: "system",
+
+        content: `Sei SchoolAgent, un esperto nell'analisi di circolari scolastiche italiane.
+
+Il tuo compito è estrarre i dati da una circolare testuale e restituire UN SOLO oggetto JSON valido.
 
 STRUTTURA JSON OBBLIGATORIA:
 
@@ -120,8 +440,8 @@ STRUTTURA JSON OBBLIGATORIA:
   "circolare": {
     "numero": "string",
     "data": "string",
-    "oggetto": "string",
-    "destinatari": []
+    "oggetto": "string (NON vuoto!)",
+    "destinatari": ["array"]
   },
   "eventi": [
     {
@@ -134,81 +454,120 @@ STRUTTURA JSON OBBLIGATORIA:
       "classe": "string"
     }
   ],
-  "ordineDelGiorno": []
+  "ordineDelGiorno": ["array"]
 }
 
-REGOLE FONDAMENTALI
+REGOLE FONDAMENTALI:
 
 1. OGGETTO
 
-Il campo "oggetto" non deve mai essere vuoto.
-Usa l'oggetto della circolare quando disponibile.
-Se non è esplicitamente indicato, ricavalo dal contenuto.
+- Il campo "oggetto" NON deve MAI essere vuoto.
+- Usa l'oggetto della circolare quando disponibile.
+- Se l'oggetto non è esplicitamente indicato, ricavalo dal contenuto della circolare.
 
-2. EVENTI
+2. DISTINZIONE ODG / EVENTI
 
-"eventi" contiene riunioni, convocazioni o attività con data e orario.
+- "ordineDelGiorno" contiene gli ARGOMENTI da discutere.
+- Gli argomenti dell'Ordine del Giorno NON sono eventi.
+- "eventi" contiene invece le RIUNIONI, CONVOCAZIONI o ATTIVITÀ che hanno una data e un orario.
+- Una riunione deve essere inserita in "eventi" anche se non è associata ad alcuna classe.
 
-"ordineDelGiorno" contiene esclusivamente gli argomenti da discutere.
+2A. EVENTO PRINCIPALE DELLA CIRCOLARE — REGOLA OBBLIGATORIA
 
-Gli argomenti dell'Ordine del Giorno NON sono eventi.
+Se la circolare riguarda la convocazione di una riunione o di un'attività scolastica con data e orario, devi creare l'evento corrispondente.
 
-Se una circolare contiene una convocazione con data e orario, devi creare almeno un evento.
+Questa regola vale in particolare per:
 
-3. CONSIGLI DI CLASSE
+- Collegio dei Docenti
+- Collegio dei Docenti Plenario
+- Collegio di Plesso
+- Dipartimenti
+- Consigli di Classe
+- GLO
+- Colloqui
+- altre riunioni scolastiche chiaramente convocate
 
-Se la circolare riguarda Consigli di Classe e contiene una tabella con più classi:
+IMPORTANTE:
 
-- leggi TUTTE le righe;
-- leggi TUTTE le colonne;
-- estrai TUTTE le classi;
-- estrai TUTTI gli orari;
-- crea un evento separato per ogni classe.
+Se la circolare contiene una convocazione con data e orario, NON puoi restituire:
 
-NON fermarti al primo evento.
-NON fermarti alla prima sede.
-NON fermarti alle sole classi IPSASR.
+"eventi": []
 
-4. TABELLE CON PIÙ SEDI
+solo perché la riunione non è associata ad una classe.
 
-Quando trovi una tabella con più colonne relative a sedi diverse, ogni colonna è indipendente.
+Per gli eventi generali:
 
-Per ogni riga devi leggere tutte le celle.
+- "classe" deve essere ""
+- "type" deve indicare la categoria corretta
+- "title" deve descrivere chiaramente la riunione
+- "sede" deve essere estratta dalla circolare
+- "data" deve essere estratta dalla circolare
+- "oraInizio" deve essere estratta dalla circolare
+- "oraFine" deve essere estratta dalla circolare
 
-NON saltare celle.
-NON sovrapporre gli orari tra colonne.
-NON assumere che una colonna continui automaticamente nell'altra.
+L'evento deve essere presente anche se la circolare contiene un lungo Ordine del Giorno.
 
-5. ORARI
+L'Ordine del Giorno NON sostituisce l'evento.
 
-Usa gli orari esattamente come indicati nella circolare.
+2B. CONTROLLO OBBLIGATORIO PRIMA DEL JSON FINALE
 
-Converti:
+Prima di restituire il JSON controlla sempre:
 
-10.30 - 11.30
+1. La circolare convoca una riunione?
+2. La circolare indica una data?
+3. La circolare indica un orario?
 
-in:
+Se la risposta è sì, devi creare almeno un evento.
 
-"oraInizio": "10:30",
-"oraFine": "11:30"
+In particolare:
 
-Non inventare orari.
+- Se è convocato un Collegio dei Docenti e sono presenti data e orario → crea l'evento.
+- Se è convocato un Collegio di Plesso e sono presenti data e orario → crea l'evento.
+- Se sono convocati Dipartimenti e sono presenti data e orario → crea l'evento.
+- Se sono convocati Consigli di Classe e sono presenti data e orario → crea gli eventi relativi alle classi.
+- Se sono convocati GLO e sono presenti data e orario → crea l'evento.
+- Se sono previsti Colloqui e sono presenti data e orario → crea l'evento.
 
-Se manca l'orario di fine:
+È VIETATO restituire "eventi":[] quando nel testo è chiaramente presente una riunione con data e orario.
 
-"oraFine": ""
+3. LETTURA DI TABELLE CON PIÙ COLONNE / SEDI — REGOLA CRITICA
 
-6. DATE
+Quando trovi una tabella con più colonne per sedi diverse
+(esempio: Biscollai, Orosei, V. Toscana), devi trattare ogni colonna come indipendente.
 
-Tutte le date degli eventi devono essere nel formato DD/MM/YYYY.
+PROCEDURA OBBLIGATORIA:
 
-Esempio:
+Passo 1: Identifica le colonne separate per sede.
 
-"08/10/2026"
+Passo 2: Per OGNI riga, estrai TUTTE le celle da tutte le colonne.
 
-7. CATEGORIE EVENTI
+- NON saltare nessuna cella.
+- NON sovrapporre le classi tra colonne diverse.
+- Ogni colonna è indipendente dalle altre.
 
-Quando applicabile usa esclusivamente:
+Passo 3: Per ogni cella, estrai:
+
+- Classe
+- Orario
+
+Passo 4: Gli orari devono essere usati ESATTAMENTE come scritti.
+
+NON inventare gli orari.
+
+NON calcolare gli orari basandoti sulle classi precedenti.
+
+NON assumere che gli orari siano consecutivi se la circolare non lo dice.
+
+ATTENZIONE:
+
+- Ogni riga può contenere più eventi diversi.
+- NON sovrapporre gli orari tra colonne diverse.
+- LEGGI TUTTE le celle.
+- LEGGI anche le celle evidenziate o formattate diversamente.
+
+4. CAMPO "type" — CATEGORIE FISSE
+
+Usa esclusivamente una delle seguenti categorie quando applicabile:
 
 - "Consigli di Classe"
 - "Collegio dei Docenti"
@@ -217,125 +576,253 @@ Quando applicabile usa esclusivamente:
 - "GLO"
 - "Colloqui"
 
-8. TITOLO
+Non inventare nuove categorie se una delle categorie sopra è appropriata.
 
-Per i Consigli di Classe usa titoli chiari come:
+5. CAMPO "title" — TITOLO COMPLETO
 
-"Consiglio di Classe 1AS"
-"Consiglio di Classe 2BS"
-"Consiglio di Classe 4A IPSASR"
+Il titolo deve identificare chiaramente l'evento.
 
-Per eventi generali usa titoli descrittivi.
+Esempi corretti:
 
-9. CLASSI DEL LICEO SCIENTIFICO DI SINISCOLA
+- "Consiglio di Classe 1AOR"
+- "Consiglio di Classe 5AS"
+- "Collegio dei Docenti Plenario"
+- "Collegio dei Docenti"
+- "Collegio di Plesso"
+- "Dipartimenti disciplinari"
+- "GLO 3AS"
+- "Colloqui con le famiglie"
 
-ATTENZIONE: il nome della classe può cambiare nella circolare.
+Non usare titoli generici come "Riunione", "Evento" o "Attività" quando il tipo di riunione è riconoscibile dal testo.
 
-Considera equivalenti:
+6. NORMALIZZAZIONE CLASSI
 
-"1^A LICEO SINISCOLA" → "1AS"
-"1^B LICEO SINISCOLA" → "1BS"
-"2^A LICEO SINISCOLA" → "2AS"
+Per IIS Pira, quando il contesto è Liceo Scientifico di Siniscola:
+
+- "1A LICEO SCIENTIFICO" → "1AS"
+- "1A LICEO SCIENTIFICO SINISCOLA" → "1AS"
+- "1A LICEO SINISCOLA" → "1AS"
+- "1^A LICEO SINISCOLA" → "1AS"
+- "1^A LICEO SCIENTIFICO SINISCOLA" → "1AS"
+
+La stessa regola vale per tutte le classi da 1 a 5 e per A/B.
+
+Esempio:
 "2^B LICEO SINISCOLA" → "2BS"
-"3^A LICEO SINISCOLA" → "3AS"
-"3^B LICEO SINISCOLA" → "3BS"
-"4^A LICEO SINISCOLA" → "4AS"
-"4^B LICEO SINISCOLA" → "4BS"
-"5^A LICEO SINISCOLA" → "5AS"
-"5^B LICEO SINISCOLA" → "5BS"
 
-Considera equivalenti anche:
+Non eliminare eventi perché la forma della classe differisce dalla configurazione dell'utente.
 
-"1A LICEO SCIENTIFICO"
-"1A LICEO SCIENTIFICO SINISCOLA"
-"1A LICEO SINISCOLA"
+7. ASSOCIAZIONE SEDI
 
-e le corrispondenti classi dalla 1A alla 5B.
+Quando possibile, associa automaticamente la sede:
 
-Quando riconosci una di queste classi, nel campo "classe" usa il codice normalizzato:
+- Classi OR → "Sede Orosei"
+- Classi AS/BS → "Sede Biscollai"
+- IPSASR/SIA/MSB → "Via Toscana"
 
-1AS, 1BS, 2AS, 2BS, 3AS, 3BS, 4AS, 4BS, 5AS, 5BS.
+Per eventi generali come Collegio dei Docenti o Collegio di Plesso, NON inventare la sede.
 
-10. IPSASR
+Se la sede è indicata nella circolare, riportala.
 
-Mantieni le classi IPSASR nella forma presente nella circolare, ad esempio:
+Se la sede non è indicata, usa:
 
-"4A IPSASR"
-"5A IPSASR"
+"sede": ""
 
-11. EVENTI GENERALI
+8. EVENTI SENZA CLASSE
 
-Per Collegio dei Docenti, Collegio di Plesso, Dipartimenti o altre riunioni generali:
+Non tutti gli eventi devono avere una classe.
 
-"classe": ""
+Per:
 
-Non eliminare l'evento solo perché non ha una classe.
+- Collegio dei Docenti
+- Collegio di Plesso
+- Dipartimenti generali
+- altre riunioni generali
+
+il campo "classe" deve essere "".
+
+NON eliminare un evento solo perché "classe" è vuota.
+
+9. DATE
+
+Tutte le date degli eventi devono essere nel formato:
+
+DD/MM/YYYY
+
+Non inventare date.
+
+10. ORARI
+
+Gli orari devono essere nel formato:
+
+HH:MM
+
+Se la circolare indica un intervallo, usa esattamente l'intervallo indicato.
+
+Se viene indicato soltanto un orario di inizio e NON è possibile determinare l'orario di fine dalla circolare, usa:
+
+"oraFine": ""
+
+NON inventare una durata.
+
+11. ORDINE DEL GIORNO
+
+Tutti gli argomenti dell'Ordine del Giorno devono essere inseriti nell'array "ordineDelGiorno".
+
+Ogni argomento deve essere un elemento separato dell'array.
+
+L'Ordine del Giorno NON deve essere trasformato in eventi.
+
+MA la riunione a cui si riferisce l'Ordine del Giorno deve comunque essere inserita in "eventi" se sono disponibili data e orario.
+
+Se nel documento è presente una sezione "Ordine del Giorno", "ODG", "Ordine del giorno" o un elenco di punti da discutere, devi estrarre tutti i punti pertinenti.
 
 12. EVENTI MULTIPLI
 
-Una circolare può contenere molti eventi.
+Se una circolare contiene più riunioni con date/orari differenti, crea un evento separato per ciascuna riunione.
 
-Devi estrarre TUTTI gli eventi pertinenti.
+Se una circolare contiene un Collegio dei Docenti e successivamente Consigli di Classe, crea tutti gli eventi pertinenti.
 
-Non limitarti ai primi eventi trovati.
+Non limitarti al primo evento trovato.
 
-13. CONTROLLO FINALE
+13. FILTRO DELLE CLASSI
 
-Prima di restituire il JSON controlla:
+${schoolContext}
 
-- numero circolare
-- data circolare
+IMPORTANTE:
+
+Il filtro delle classi si applica agli eventi associati a una specifica classe.
+
+NON eliminare gli eventi generali solo perché "classe" è vuota.
+
+Per esempio:
+
+{
+  "title": "Collegio dei Docenti",
+  "type": "Collegio dei Docenti",
+  "classe": ""
+}
+
+deve rimanere un evento valido.
+
+14. CONTROLLO FINALE
+
+Prima di restituire il JSON verifica attentamente:
+
+- numero della circolare
+- data della circolare
 - oggetto
 - destinatari
-- tutti gli eventi
-- tutte le date
-- tutti gli orari
-- tutte le classi
-- tutte le sedi
+- eventi
+- TUTTI gli eventi presenti nelle tabelle
+- date degli eventi
+- orari degli eventi
+- classi
+- normalizzazione delle classi
+- sedi
 - Ordine del Giorno
 
-Se trovi una tabella di Consigli di Classe del Liceo Scientifico di Siniscola, verifica esplicitamente di avere considerato tutte le classi presenti nella tabella.
+CONTROLLO SPECIALE:
 
-14. FORMATO
+Se nell'oggetto o nel testo compare una convocazione di:
+
+"Collegio dei Docenti",
+"Collegio dei Docenti Plenario",
+"Collegio di Plesso",
+"Dipartimenti",
+"Consiglio di Classe",
+"GLO",
+"Colloqui"
+
+e sono presenti data e orario della riunione, assicurati che esista almeno un elemento corrispondente nell'array "eventi".
+
+NON restituire un array "eventi" vuoto in questo caso.
+
+15. FORMATO DELLA RISPOSTA
 
 Restituisci ESCLUSIVAMENTE JSON valido.
 
-Non usare Markdown.
-Non usare blocchi di codice.
-Non aggiungere spiegazioni prima o dopo il JSON.
+NON usare markdown.
 
-${schoolContext}`;
+NON usare blocchi di codice.
 
-  const response = await openai.chat.completions.create({
-    model: "openai/gpt-oss-120b",
-    messages: [
-      {
-        role: "system",
-        content: systemPrompt,
+NON aggiungere spiegazioni prima o dopo il JSON.
+
+${schoolContext}
+`,
       },
       {
         role: "user",
-        content: `Analizza questa circolare:\n\n${text}`,
+        content: `Analizza questa circolare:
+
+${text}`,
       },
     ],
+
     response_format: {
       type: "json_object",
     },
   });
 
-  const content = response.choices[0]?.message?.content || "{}";
+  const content =
+    response.choices[0]?.message?.content || "{}";
 
   console.log("🤖 RAW AI JSON OUTPUT:", content);
+
   console.log(
     "🏫 Scuola identificata:",
-    isChironi ? "Chironi-Satta" : isPira ? "Pira" : "Sconosciuta"
+    isChironi
+      ? "Chironi-Satta"
+      : isPira
+        ? "Pira"
+        : "Sconosciuta"
   );
-  console.log("📚 Classi rilevanti:", relevantClasses);
+
+  console.log(
+    "📚 Classi configurate dall'utente:",
+    userClasses
+  );
+
+  console.log(
+    "📚 Classi rilevanti normalizzate:",
+    relevantClasses
+  );
 
   try {
-    return JSON.parse(content);
+    const parsed = JSON.parse(content);
+
+    /*
+     * Secondo livello di protezione:
+     * normalizziamo gli eventi DOPO la risposta AI.
+     */
+    if (isPira && Array.isArray(parsed.eventi)) {
+      parsed.eventi = normalizePiraEvents(parsed.eventi);
+    }
+
+    /*
+     * Log utile per verificare esattamente cosa arriva
+     * al controller dopo la normalizzazione.
+     */
+    console.log(
+      "✅ EVENTI DOPO NORMALIZZAZIONE:",
+      JSON.stringify(parsed.eventi, null, 2)
+    );
+
+    console.log(
+      "📋 ORDINE DEL GIORNO ESTRATTO:",
+      JSON.stringify(
+        parsed.ordineDelGiorno || [],
+        null,
+        2
+      )
+    );
+
+    return parsed;
   } catch (error) {
-    console.error("❌ Errore parsing JSON:", error);
+    console.error(
+      "❌ Errore parsing JSON:",
+      error
+    );
 
     return {
       circolare: {
