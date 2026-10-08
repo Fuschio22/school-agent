@@ -1,20 +1,25 @@
 import OpenAI from "openai";
 
-export async function analyzeCircularText(text: string, userClasses: string[] = []) {
+export async function analyzeCircularText(
+  text: string,
+  userClasses: string[] = []
+) {
   const openai = new OpenAI({
     apiKey: process.env.OPENAI_API_KEY,
     baseURL: "https://api.groq.com/openai/v1",
   });
 
+  const upperText = text.toUpperCase();
+
   const isChironi =
-    text.toUpperCase().includes("CHIRONI") ||
-    text.toUpperCase().includes("NUTD110002") ||
-    text.toUpperCase().includes("NUORO");
+    upperText.includes("CHIRONI") ||
+    upperText.includes("NUTD110002") ||
+    upperText.includes("NUORO");
 
   const isPira =
-    text.toUpperCase().includes("PIRA") ||
-    text.toUpperCase().includes("SINISCOLA") ||
-    text.toUpperCase().includes("LICEO SCIENTIFICO");
+    upperText.includes("PIRA") ||
+    upperText.includes("SINISCOLA") ||
+    upperText.includes("LICEO SCIENTIFICO");
 
   let relevantClasses = userClasses;
   let schoolContext = "";
@@ -28,40 +33,86 @@ export async function analyzeCircularText(text: string, userClasses: string[] = 
     schoolContext =
       "\n\n🏫 SCUOLA: CHIRONI-SATTA (Nuoro)\n" +
       `CLASSI RILEVANTI: ${relevantClasses.join(", ")}\n` +
-      "ISTRUZIONE: Estrai SOLO eventi per queste classi OR. Ignora tutte le altre.";
+      "ISTRUZIONE: estrai gli eventi delle classi OR pertinenti alla scuola. " +
+      "Non eliminare eventi generali come Collegi, Dipartimenti o altre riunioni senza classe.";
 
     schoolName = "ITC Chironi-Satta";
   } else if (isPira && !isChironi) {
-    relevantClasses = userClasses.filter(
-      (c) =>
-        c.toUpperCase().includes("AS") ||
-        c.toUpperCase().includes("BS") ||
-        c.toUpperCase().includes("IPSASR")
-    );
+    /*
+     * Per il Pira utilizziamo tutte le classi effettivamente configurate
+     * dall'utente che possono appartenere alla scuola.
+     *
+     * IMPORTANTE:
+     * il Liceo Scientifico di Siniscola può essere scritto nella circolare
+     * in molti modi diversi:
+     *
+     * 1^A LICEO SINISCOLA
+     * 1^A LICEO SCIENTIFICO SINISCOLA
+     * 1A LICEO SINISCOLA
+     * 1AS
+     * 1A Liceo Scientifico
+     *
+     * Le classi 1AS-5AS e 1BS-5BS sono quindi esplicitamente incluse.
+     */
+
+    relevantClasses = userClasses.filter((c) => {
+      const normalized = c
+        .toUpperCase()
+        .replace(/\s+/g, " ")
+        .trim();
+
+      return (
+        normalized.includes("AS") ||
+        normalized.includes("BS") ||
+        normalized.includes("IPSASR") ||
+        normalized.includes("LICEO SCIENTIFICO") ||
+        normalized.includes("LICEO SINISCOLA")
+      );
+    });
 
     schoolContext =
-      "\n\n🏫 SCUOLA: IIS PIRA (Liceo Scientifico Siniscola)\n" +
-      `CLASSI RILEVANTI: ${relevantClasses.join(", ")}\n` +
-      "ISTRUZIONE: Estrai SOLO eventi per queste classi. Ignora tutte le altre.";
+      "\n\n🏫 SCUOLA: IIS PIRA - SINISCOLA\n" +
+      `CLASSI CONFIGURATE DALL'UTENTE: ${relevantClasses.join(", ")}\n\n` +
+      "IMPORTANTE: la circolare può utilizzare denominazioni diverse " +
+      "da quelle presenti nelle impostazioni dell'utente.\n\n" +
+      "Per il LICEO SCIENTIFICO DI SINISCOLA devi riconoscere come equivalenti:\n" +
+      "- 1^A LICEO SINISCOLA = 1AS\n" +
+      "- 1^B LICEO SINISCOLA = 1BS\n" +
+      "- 2^A LICEO SINISCOLA = 2AS\n" +
+      "- 2^B LICEO SINISCOLA = 2BS\n" +
+      "- 3^A LICEO SINISCOLA = 3AS\n" +
+      "- 3^B LICEO SINISCOLA = 3BS\n" +
+      "- 4^A LICEO SINISCOLA = 4AS\n" +
+      "- 4^B LICEO SINISCOLA = 4BS\n" +
+      "- 5^A LICEO SINISCOLA = 5AS\n" +
+      "- 5^B LICEO SINISCOLA = 5BS\n\n" +
+      "Sono equivalenti anche forme come '1A LICEO SCIENTIFICO', " +
+      "'1A LICEO SCIENTIFICO SINISCOLA' e '1A LICEO SINISCOLA'.\n\n" +
+      "REGOLA FONDAMENTALE: se nel testo della circolare trovi una tabella " +
+      "con i Consigli di Classe del Liceo Scientifico di Siniscola, " +
+      "DEVI estrarre TUTTI gli eventi delle classi 1A, 1B, 2A, 2B, " +
+      "3A, 3B, 4A, 4B, 5A e 5B presenti nella tabella.\n\n" +
+      "Non fermarti ai primi eventi trovati e non limitarti alle classi IPSASR.\n" +
+      "La presenza di IPSASR non deve impedire l'estrazione degli eventi del Liceo.\n\n" +
+      "Per le classi estratte usa nel campo 'classe' il codice della classe " +
+      "quando è chiaramente riconoscibile, preferibilmente nella forma " +
+      "1AS, 1BS, 2AS, 2BS, 3AS, 3BS, 4AS, 4BS, 5AS, 5BS.\n\n" +
+      "Le classi IPSASR devono invece essere mantenute come 4A IPSASR, " +
+      "5A IPSASR, ecc.\n\n" +
+      "Non eliminare eventi generali come Collegi, Dipartimenti o altre " +
+      "riunioni senza classe.";
 
     schoolName = "IIS Pira";
   } else {
     schoolContext =
-      "\n\n⚠️ SCUOLA NON IDENTIFICATA: estrai eventi per tutte le classi configurate.";
+      "\n\n⚠️ SCUOLA NON IDENTIFICATA: estrai gli eventi per tutte le classi configurate.";
 
     schoolName = "Istituto";
   }
 
-  const response = await openai.chat.completions.create({
-    model: "openai/gpt-oss-120b",
+  const systemPrompt = `Sei SchoolAgent, un esperto nell'analisi di circolari scolastiche italiane.
 
-    messages: [
-      {
-        role: "system",
-
-        content: `Sei SchoolAgent, un esperto nell'analisi di circolari scolastiche italiane.
-
-Il tuo compito è estrarre i dati da una circolare testuale e restituire UN SOLO oggetto JSON valido.
+Il tuo compito è leggere attentamente una circolare scolastica e restituire UN SOLO oggetto JSON valido.
 
 STRUTTURA JSON OBBLIGATORIA:
 
@@ -69,8 +120,8 @@ STRUTTURA JSON OBBLIGATORIA:
   "circolare": {
     "numero": "string",
     "data": "string",
-    "oggetto": "string (NON vuoto!)",
-    "destinatari": ["array"]
+    "oggetto": "string",
+    "destinatari": []
   },
   "eventi": [
     {
@@ -83,163 +134,81 @@ STRUTTURA JSON OBBLIGATORIA:
       "classe": "string"
     }
   ],
-  "ordineDelGiorno": ["array"]
+  "ordineDelGiorno": []
 }
 
-REGOLE FONDAMENTALI:
+REGOLE FONDAMENTALI
 
 1. OGGETTO
 
-- Il campo "oggetto" NON deve MAI essere vuoto.
-- Usa l'oggetto della circolare quando disponibile.
-- Se l'oggetto non è esplicitamente indicato, ricavalo dal contenuto della circolare.
+Il campo "oggetto" non deve mai essere vuoto.
+Usa l'oggetto della circolare quando disponibile.
+Se non è esplicitamente indicato, ricavalo dal contenuto.
 
-2. DISTINZIONE ODG / EVENTI
+2. EVENTI
 
-- "ordineDelGiorno" contiene gli ARGOMENTI da discutere.
-- Gli argomenti dell'Ordine del Giorno NON sono eventi.
-- "eventi" contiene invece le RIUNIONI, CONVOCAZIONI o ATTIVITÀ che hanno una data e un orario.
-- Una riunione deve essere inserita in "eventi" anche se non è associata ad alcuna classe.
+"eventi" contiene riunioni, convocazioni o attività con data e orario.
 
-2A. EVENTO PRINCIPALE DELLA CIRCOLARE — REGOLA OBBLIGATORIA
+"ordineDelGiorno" contiene esclusivamente gli argomenti da discutere.
 
-Se la circolare riguarda la convocazione di una riunione o di un'attività scolastica con data e orario, devi creare l'evento corrispondente.
+Gli argomenti dell'Ordine del Giorno NON sono eventi.
 
-Questa regola vale in particolare per:
+Se una circolare contiene una convocazione con data e orario, devi creare almeno un evento.
 
-- Collegio dei Docenti
-- Collegio dei Docenti Plenario
-- Collegio di Plesso
-- Dipartimenti
-- Consigli di Classe
-- GLO
-- Colloqui
-- altre riunioni scolastiche chiaramente convocate
+3. CONSIGLI DI CLASSE
 
-IMPORTANTE:
+Se la circolare riguarda Consigli di Classe e contiene una tabella con più classi:
 
-Se la circolare contiene una convocazione con data e orario, NON puoi restituire:
+- leggi TUTTE le righe;
+- leggi TUTTE le colonne;
+- estrai TUTTE le classi;
+- estrai TUTTI gli orari;
+- crea un evento separato per ogni classe.
 
-"eventi": []
+NON fermarti al primo evento.
+NON fermarti alla prima sede.
+NON fermarti alle sole classi IPSASR.
 
-solo perché la riunione non è associata a una classe.
+4. TABELLE CON PIÙ SEDI
 
-Per gli eventi generali:
+Quando trovi una tabella con più colonne relative a sedi diverse, ogni colonna è indipendente.
 
-- "classe" deve essere ""
-- "type" deve indicare la categoria corretta
-- "title" deve descrivere chiaramente la riunione
-- "sede" deve essere estratta dalla circolare
-- "data" deve essere estratta dalla circolare
-- "oraInizio" deve essere estratta dalla circolare
-- "oraFine" deve essere estratta dalla circolare
+Per ogni riga devi leggere tutte le celle.
 
-ESEMPIO:
+NON saltare celle.
+NON sovrapporre gli orari tra colonne.
+NON assumere che una colonna continui automaticamente nell'altra.
 
-Se l'oggetto della circolare è:
+5. ORARI
 
-"Convocazione Collegio dei Docenti Plenario e presa di servizio A.S. 2026/2027"
+Usa gli orari esattamente come indicati nella circolare.
 
-e nel testo della circolare è indicata una data e un'ora per il Collegio dei Docenti, devi creare un evento come:
+Converti:
 
-{
-  "title": "Collegio dei Docenti Plenario",
-  "type": "Collegio dei Docenti",
-  "sede": "sede indicata nella circolare",
-  "data": "DD/MM/YYYY",
-  "oraInizio": "HH:MM",
-  "oraFine": "HH:MM",
-  "classe": ""
-}
+10.30 - 11.30
 
-L'evento deve essere presente anche se la circolare contiene un lungo Ordine del Giorno.
+in:
 
-L'Ordine del Giorno NON sostituisce l'evento.
+"oraInizio": "10:30",
+"oraFine": "11:30"
 
-2B. CONTROLLO OBBLIGATORIO PRIMA DEL JSON FINALE
+Non inventare orari.
 
-Prima di restituire il JSON controlla sempre:
+Se manca l'orario di fine:
 
-1. La circolare convoca una riunione?
-2. La circolare indica una data?
-3. La circolare indica un orario?
+"oraFine": ""
 
-Se la risposta è sì, devi creare almeno un evento.
+6. DATE
 
-In particolare:
+Tutte le date degli eventi devono essere nel formato DD/MM/YYYY.
 
-- Se è convocato un Collegio dei Docenti e sono presenti data e orario → crea l'evento.
-- Se è convocato un Collegio di Plesso e sono presenti data e orario → crea l'evento.
-- Se sono convocati Dipartimenti e sono presenti data e orario → crea l'evento.
-- Se sono convocati Consigli di Classe e sono presenti data e orario → crea gli eventi relativi alle classi.
-- Se sono convocati GLO e sono presenti data e orario → crea l'evento.
-- Se sono previsti Colloqui e sono presenti data e orario → crea l'evento.
+Esempio:
 
-È VIETATO restituire "eventi":[] quando nel testo è chiaramente presente una riunione con data e orario.
+"08/10/2026"
 
-3. LETTURA DI TABELLE CON PIÙ COLONNE / SEDI — REGOLA CRITICA
+7. CATEGORIE EVENTI
 
-Quando trovi una tabella con più colonne per sedi diverse
-(esempio: Biscollai, Orosei, V. Toscana), devi trattare ogni colonna come indipendente.
-
-ESEMPIO:
-
-| Biscollai | Orosei | V. Toscana |
-|-----------|--------|------------|
-| 5E  14.45/15.15 | 5A OR  14.45/15.15 | 5SIA  15.00/15.30 |
-| 4E  15.15/15.45 | 4 OR  15.15/15.45 | 4SIA  15.30/16.00 |
-
-PROCEDURA OBBLIGATORIA:
-
-Passo 1: Identifica le tre colonne separate per sede.
-
-- Colonna 1: Biscollai (classi AS/BS/ETU)
-- Colonna 2: Orosei (classi OR)
-- Colonna 3: V. Toscana (classi IPSASR/SIA/MSB)
-
-Passo 2: Per OGNI riga, estrai TUTTE le celle da tutte le colonne.
-
-- NON saltare nessuna cella.
-- NON sovrapporre le classi tra colonne diverse.
-- Ogni colonna è indipendente dalle altre.
-
-Passo 3: Per ogni cella, estrai:
-
-- Classe: il testo a sinistra.
-- Orario: il testo a destra.
-
-Esempi:
-
-"5A OR 14.45/15.15"
-
-→ classe: "5A OR"
-→ oraInizio: "14:45"
-→ oraFine: "15:15"
-
-"1 OR 17.00/17.45"
-
-→ classe: "1 OR"
-→ oraInizio: "17:00"
-→ oraFine: "17:45"
-
-Passo 4: Gli orari devono essere usati ESATTAMENTE come scritti.
-
-NON inventare gli orari.
-
-NON calcolare gli orari basandoti sulle classi precedenti.
-
-NON assumere che gli orari siano consecutivi se la circolare non lo dice.
-
-⚠️ ATTENZIONE:
-
-- Ogni riga può contenere FINO A 3 eventi diversi.
-- NON sovrapporre gli orari tra colonne diverse.
-- LEGGI TUTTE le celle.
-- LEGGI anche le celle evidenziate o formattate diversamente.
-
-4. CAMPO "type" — CATEGORIE FISSE
-
-Usa esclusivamente una delle seguenti categorie quando applicabile:
+Quando applicabile usa esclusivamente:
 
 - "Consigli di Classe"
 - "Collegio dei Docenti"
@@ -248,220 +217,107 @@ Usa esclusivamente una delle seguenti categorie quando applicabile:
 - "GLO"
 - "Colloqui"
 
-Non inventare nuove categorie se una delle categorie sopra è appropriata.
+8. TITOLO
 
-5. CAMPO "title" — TITOLO COMPLETO
+Per i Consigli di Classe usa titoli chiari come:
 
-Il titolo deve identificare chiaramente l'evento.
+"Consiglio di Classe 1AS"
+"Consiglio di Classe 2BS"
+"Consiglio di Classe 4A IPSASR"
 
-Esempi corretti:
+Per eventi generali usa titoli descrittivi.
 
-- "Consiglio di Classe 1AOR"
-- "Consiglio di Classe 5AS"
-- "Collegio dei Docenti Plenario"
-- "Collegio dei Docenti"
-- "Collegio di Plesso"
-- "Dipartimenti disciplinari"
-- "Dipartimenti disciplinari ITC Chironi-Satta"
-- "GLO 3AS"
-- "Colloqui con le famiglie"
+9. CLASSI DEL LICEO SCIENTIFICO DI SINISCOLA
 
-Non usare titoli generici come:
+ATTENZIONE: il nome della classe può cambiare nella circolare.
 
-- "Riunione"
-- "Evento"
-- "Attività"
+Considera equivalenti:
 
-quando il tipo di riunione è riconoscibile dal testo.
+"1^A LICEO SINISCOLA" → "1AS"
+"1^B LICEO SINISCOLA" → "1BS"
+"2^A LICEO SINISCOLA" → "2AS"
+"2^B LICEO SINISCOLA" → "2BS"
+"3^A LICEO SINISCOLA" → "3AS"
+"3^B LICEO SINISCOLA" → "3BS"
+"4^A LICEO SINISCOLA" → "4AS"
+"4^B LICEO SINISCOLA" → "4BS"
+"5^A LICEO SINISCOLA" → "5AS"
+"5^B LICEO SINISCOLA" → "5BS"
 
-6. NORMALIZZAZIONE CLASSI
+Considera equivalenti anche:
 
-Normalizza le classi OR nel seguente modo:
+"1A LICEO SCIENTIFICO"
+"1A LICEO SCIENTIFICO SINISCOLA"
+"1A LICEO SINISCOLA"
 
-- "1 OR" → "1AOR"
-- "2 OR" → "2AOR"
-- "3 OR" → "3AOR"
-- "4 OR" → "4AOR"
-- "5A OR" → "5AOR"
-- "5B OR" → "5BOR"
+e le corrispondenti classi dalla 1A alla 5B.
 
-Mantieni le altre classi nel formato corretto indicato dalla circolare.
+Quando riconosci una di queste classi, nel campo "classe" usa il codice normalizzato:
 
-7. ASSOCIAZIONE SEDI
+1AS, 1BS, 2AS, 2BS, 3AS, 3BS, 4AS, 4BS, 5AS, 5BS.
 
-Quando possibile, associa automaticamente la sede:
+10. IPSASR
 
-- Classi OR → "Sede Orosei"
-- Classi AS/BS → "Sede Biscollai"
-- IPSASR/SIA/MSB → "Via Toscana"
+Mantieni le classi IPSASR nella forma presente nella circolare, ad esempio:
 
-Per eventi generali come Collegio dei Docenti o Collegio di Plesso, NON inventare la sede.
+"4A IPSASR"
+"5A IPSASR"
 
-Se la sede è indicata nella circolare, riportala.
+11. EVENTI GENERALI
 
-Se la sede non è indicata, usa:
-
-"sede": ""
-
-8. EVENTI SENZA CLASSE
-
-Non tutti gli eventi devono avere una classe.
-
-Per:
-
-- Collegio dei Docenti
-- Collegio di Plesso
-- Dipartimenti generali
-- altre riunioni generali
-
-il campo:
+Per Collegio dei Docenti, Collegio di Plesso, Dipartimenti o altre riunioni generali:
 
 "classe": ""
 
-è corretto e obbligatorio.
-
-NON eliminare un evento solo perché "classe" è vuota.
-
-9. DATE
-
-Tutte le date degli eventi devono essere nel formato:
-
-DD/MM/YYYY
-
-Esempio:
-
-"01/09/2026"
-
-Se la circolare utilizza una data testuale come:
-
-"martedì 1° settembre 2026"
-
-deve essere convertita in:
-
-"01/09/2026"
-
-Non inventare date.
-
-10. ORARI
-
-Gli orari devono essere nel formato:
-
-HH:MM
-
-Esempio:
-
-"10:30"
-
-Se la circolare indica un intervallo:
-
-"10.30 - 11.30"
-
-restituisci:
-
-"oraInizio": "10:30",
-"oraFine": "11:30"
-
-Se viene indicato soltanto un orario di inizio e NON è possibile determinare l'orario di fine dalla circolare, NON inventare una durata.
-
-In quel caso usa:
-
-"oraFine": ""
-
-11. ORDINE DEL GIORNO
-
-Tutti gli argomenti dell'Ordine del Giorno devono essere inseriti nell'array:
-
-"ordineDelGiorno"
-
-Ogni argomento deve essere un elemento separato dell'array.
-
-L'Ordine del Giorno NON deve essere trasformato in eventi.
-
-MA la riunione a cui si riferisce l'Ordine del Giorno deve comunque essere inserita in "eventi" se sono disponibili data e orario.
+Non eliminare l'evento solo perché non ha una classe.
 
 12. EVENTI MULTIPLI
 
-Se una circolare contiene più riunioni con date/orari differenti, crea un evento separato per ciascuna riunione.
+Una circolare può contenere molti eventi.
 
-Se una circolare contiene:
+Devi estrarre TUTTI gli eventi pertinenti.
 
-- un Collegio dei Docenti
-- e successivamente Consigli di Classe
+Non limitarti ai primi eventi trovati.
 
-crea tutti gli eventi pertinenti.
+13. CONTROLLO FINALE
 
-Non limitarti al primo evento trovato.
+Prima di restituire il JSON controlla:
 
-13. FILTRO DELLE CLASSI
-
-${schoolContext}
-
-IMPORTANTE:
-
-Il filtro delle classi si applica agli eventi associati a una specifica classe.
-
-NON eliminare gli eventi generali solo perché "classe" è vuota.
-
-Per esempio:
-
-{
-  "title": "Collegio dei Docenti",
-  "type": "Collegio dei Docenti",
-  "classe": ""
-}
-
-deve rimanere un evento valido.
-
-14. CONTROLLO FINALE
-
-Prima di restituire il JSON verifica attentamente:
-
-- numero della circolare
-- data della circolare
+- numero circolare
+- data circolare
 - oggetto
 - destinatari
-- eventi
-- date degli eventi
-- orari degli eventi
-- classi
-- sedi
+- tutti gli eventi
+- tutte le date
+- tutti gli orari
+- tutte le classi
+- tutte le sedi
 - Ordine del Giorno
 
-CONTROLLO SPECIALE:
+Se trovi una tabella di Consigli di Classe del Liceo Scientifico di Siniscola, verifica esplicitamente di avere considerato tutte le classi presenti nella tabella.
 
-Se nell'oggetto o nel testo compare una convocazione di:
-
-"Collegio dei Docenti",
-"Collegio dei Docenti Plenario",
-"Collegio di Plesso",
-"Dipartimenti",
-"Consiglio di Classe",
-"GLO",
-"Colloqui"
-
-e sono presenti data e orario della riunione, assicurati che esista almeno un elemento corrispondente nell'array "eventi".
-
-NON restituire un array "eventi" vuoto in questo caso.
-
-15. FORMATO DELLA RISPOSTA
+14. FORMATO
 
 Restituisci ESCLUSIVAMENTE JSON valido.
 
-NON usare markdown.
+Non usare Markdown.
+Non usare blocchi di codice.
+Non aggiungere spiegazioni prima o dopo il JSON.
 
-NON usare blocchi di codice.
+${schoolContext}`;
 
-NON aggiungere spiegazioni prima o dopo il JSON.
-
-${schoolContext}
-`,
+  const response = await openai.chat.completions.create({
+    model: "openai/gpt-oss-120b",
+    messages: [
+      {
+        role: "system",
+        content: systemPrompt,
       },
       {
         role: "user",
         content: `Analizza questa circolare:\n\n${text}`,
       },
     ],
-
     response_format: {
       type: "json_object",
     },
