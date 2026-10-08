@@ -107,13 +107,6 @@ const getWeekDays = (date: Date) => {
   });
 };
 
-const formatTime = (minutes: number) => {
-  const hours = Math.floor(minutes / 60);
-  const mins = minutes % 60;
-
-  return `${pad(hours)}:${pad(mins)}`;
-};
-
 const timeToMinutes = (time: string) => {
   const [hours, minutes] = time.split(":").map(Number);
   return hours * 60 + minutes;
