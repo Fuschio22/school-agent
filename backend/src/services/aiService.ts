@@ -362,7 +362,7 @@ export async function analyzeCircularText(
      * è chiaramente del Liceo di Siniscola, manteniamo
      * comunque disponibili tutti i codici canonici.
      */
-    const canonicalLiceoClasses = [
+    const canonicalPiraClasses = [
       "1AS",
       "2AS",
       "3AS",
@@ -373,9 +373,11 @@ export async function analyzeCircularText(
       "3BS",
       "4BS",
       "5BS",
+      "4A IPSASR",
+      "5A IPSASR",
     ];
 
-    for (const classCode of canonicalLiceoClasses) {
+    for (const classCode of canonicalPiraClasses) {
       if (!relevantClasses.includes(classCode)) {
         relevantClasses.push(classCode);
       }
