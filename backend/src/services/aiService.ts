@@ -489,87 +489,231 @@ function extractPiraClassFromText(value: unknown): string {
 /**
  * Recupera in modo deterministico gli eventi IPSASR dal testo della circolare.
  */
-function extractIpsasrEventsFromText(text: string): any[] {
-  if (!text) return [];
-
-  const normalizedText = String(text)
+function normalizeScheduleText(text: string): string {
+  return String(text || "")
     .replace(/\u00a0/g, " ")
     .replace(/[–—−]/g, "-")
     .replace(/\r/g, "")
-    .replace(/[ \t]+/g, " ")
-    .trim();
+    .replace(/[ \t]+/g, " ");
+}
 
-  const dateRegex = /\b(\d{1,2}[\/.\-]\d{1,2}[\/.\-]\d{4})\b/g;
-  const dateMatches = [...normalizedText.matchAll(dateRegex)];
-  const results: any[] = [];
+function canonicalizeScheduleDate(value: string): string {
+  const parts = String(value).split(/[\/.\-]/).map(Number);
+  if (parts.length !== 3 || parts.some(Number.isNaN)) return String(value).trim();
+  const [day, month, year] = parts;
+  return `${String(day).padStart(2, "0")}/${String(month).padStart(2, "0")}/${year}`;
+}
 
-  const canonicalizeDate = (value: string): string => {
-    const parts = value.split(/[\/.\-]/).map(Number);
-    if (parts.length !== 3 || parts.some(Number.isNaN)) return value;
-    const [day, month, year] = parts;
-    return `${String(day).padStart(2, "0")}/${String(month).padStart(2, "0")}/${year}`;
-  };
+function canonicalizeScheduleTime(value: string): string {
+  const cleaned = String(value).replace(/[.,]/g, ":");
+  const match = cleaned.match(/^(\d{1,2}):(\d{2})$/);
+  if (!match) return String(value).trim();
+  return `${String(Number(match[1])).padStart(2, "0")}:${match[2]}`;
+}
 
-  const canonicalizeTime = (value: string): string => {
-    const cleaned = value.replace(/[.,]/g, ":");
-    const [hours, minutes] = cleaned.split(":").map(Number);
-    if (Number.isNaN(hours) || Number.isNaN(minutes)) return value;
-    return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
-  };
-
-  for (let i = 0; i < dateMatches.length; i++) {
-    const dateMatch = dateMatches[i];
-    const start = (dateMatch.index ?? 0) + dateMatch[0].length;
-    const end = i + 1 < dateMatches.length
-      ? (dateMatches[i + 1].index ?? normalizedText.length)
-      : normalizedText.length;
-
-    const section = normalizedText.slice(start, end);
-    const rowRegex = /(\d{1,2}[\.:]\d{2})\s*-\s*(\d{1,2}[\.:]\d{2})\s+(\d{1,2})\s*\^?\s*([AB])\s+IPSASR\b/gi;
-
-    for (const rowMatch of section.matchAll(rowRegex)) {
-      const canonicalClass = `${rowMatch[3]}${rowMatch[4].toUpperCase()} IPSASR`;
-      if (canonicalClass !== "4A IPSASR" && canonicalClass !== "5A IPSASR") continue;
-
-      results.push({
-        title: `Consiglio di Classe ${canonicalClass}`,
-        type: "Consigli di Classe",
-        sede: "Sede Agrario",
-        data: canonicalizeDate(dateMatch[1]),
-        oraInizio: canonicalizeTime(rowMatch[1]),
-        oraFine: canonicalizeTime(rowMatch[2]),
-        classe: canonicalClass,
-      });
-    }
+function extractPiraDateMatches(text: string): Array<{ value: string; index: number }> {
+  const results: Array<{ value: string; index: number }> = [];
+  const numeric = /\b(\d{1,2}[\/.\-]\d{1,2}[\/.\-]\d{4})\b/g;
+  for (const match of text.matchAll(numeric)) {
+    results.push({ value: match[1], index: match.index ?? 0 });
   }
-
   return results;
 }
 
-/**
- * Aggiunge al risultato AI gli eventuali eventi IPSASR mancanti.
- */
-function ensurePiraIpsasrEvents(events: any[], text: string): any[] {
+function extractPiraScheduleEventsFromSection(
+  sectionText: string,
+  sectionType: "liceo" | "ipsasr"
+): any[] {
+  const section = normalizeScheduleText(sectionText);
+  const dates = extractPiraDateMatches(section);
+  const events: any[] = [];
+
+  const classPattern = sectionType === "liceo"
+    ? "([1-5])\\s*\\^?\\s*([AB])\\s+(?:LICEO\\s+SCIENTIFICO(?:\\s+DI)?(?:\\s+SINISCOLA)?|LICEO\\s+SINISCOLA)\\b"
+    : "([45])\\s*\\^?\\s*(A)\\s+IPSASR\\b";
+
+  const timeRegex = /(\d{1,2}[\.:]\d{2})\s*-\s*(\d{1,2}[\.:]\d{2})/g;
+  const classRegex = new RegExp(classPattern, "gi");
+
+  const addEvent = (
+    date: string,
+    startTime: string,
+    endTime: string,
+    classNumber: string,
+    classLetter: string
+  ) => {
+    const canonicalClass = sectionType === "liceo"
+      ? `${classNumber}${classLetter.toUpperCase()}S`
+      : `${classNumber}A IPSASR`;
+
+    if (sectionType === "ipsasr" && canonicalClass !== "4A IPSASR" && canonicalClass !== "5A IPSASR") {
+      return;
+    }
+
+    events.push({
+      title: `Consiglio di Classe ${canonicalClass}`,
+      type: "Consigli di Classe",
+      sede: sectionType === "ipsasr" ? "Sede Agrario" : "Sede Centrale",
+      data: canonicalizeScheduleDate(date),
+      oraInizio: canonicalizeScheduleTime(startTime),
+      oraFine: canonicalizeScheduleTime(endTime),
+      classe: canonicalClass,
+    });
+  };
+
+  for (let i = 0; i < dates.length; i++) {
+    const current = dates[i];
+    const next = dates[i + 1];
+    const blockStart = current.index + current.value.length;
+    const blockEnd = next ? next.index : section.length;
+    const block = section.slice(blockStart, blockEnd);
+
+    const classMatches = [...block.matchAll(classRegex)];
+    const timeMatches = [...block.matchAll(timeRegex)];
+
+    for (const classMatch of classMatches) {
+      const groups = classMatch.slice(1);
+      const classNumber = groups[0];
+      const classLetter = groups[1];
+      const classStart = classMatch.index ?? 0;
+      const classEnd = classStart + classMatch[0].length;
+
+      const previousTimes = timeMatches.filter((timeMatch) =>
+        (timeMatch.index ?? 0) + timeMatch[0].length <= classStart
+      );
+      const nextTimes = timeMatches.filter((timeMatch) =>
+        (timeMatch.index ?? 0) >= classEnd
+      );
+
+      const previous = previousTimes.length > 0
+        ? previousTimes[previousTimes.length - 1]
+        : undefined;
+      const following = nextTimes.length > 0
+        ? nextTimes[0]
+        : undefined;
+
+      let selected = previous;
+      if (following) {
+        const previousDistance = previous
+          ? classStart - ((previous.index ?? 0) + previous[0].length)
+          : Number.POSITIVE_INFINITY;
+        const followingDistance = (following.index ?? 0) - classEnd;
+
+        if (followingDistance < previousDistance) {
+          selected = following;
+        }
+      }
+
+      if (!selected) continue;
+
+      const timeGroups = selected.slice(1);
+      addEvent(
+        current.value,
+        timeGroups[0],
+        timeGroups[1],
+        classNumber,
+        classLetter
+      );
+    }
+  }
+
+  const unique = new Map<string, any>();
+  for (const event of events) {
+    const key = `${event.classe}|${event.data}|${event.oraInizio}|${event.oraFine}`;
+    if (!unique.has(key)) unique.set(key, event);
+  }
+
+  return [...unique.values()];
+}
+
+function extractPiraScheduleEvents(text: string): any[] {
+  const normalized = normalizeScheduleText(text);
+  if (!normalized) return [];
+
+  const events: any[] = [];
+
+  const sectionDefinitions: Array<{
+    type: "liceo" | "ipsasr";
+    start: RegExp;
+    end: RegExp;
+  }> = [
+    {
+      type: "ipsasr",
+      start: /ISTITUTO\s+PROFESSIONALE(?:\s+PER\s+L[’']AGRICOLTURA)?(?:\s+E\s+LO\s+SVILUPPO\s+RURALE|\s+SERVIZI\s+AGRICOLTURA\s+SVILUPPO\s+RURALE)[\s\S]*?Sede\s+(?:Centrale|Agrario)/i,
+      end: /LICEO\s+SCIENTIFICO\s+DI?\s+SINISCOLA|LICEO\s+SCIENTIFICO\s+SINISCOLA|LICEO\s+SCIENTIFICO\s+DI?\s+DORGALI|ISTITUTO\s+TECNICO\s+TRASPORTI|ISTITUTO\s+PROFESSIONALE|IL\s+DIRIGENTE\s+SCOLASTICO/i,
+    },
+    {
+      type: "liceo",
+      start: /LICEO\s+SCIENTIFICO\s+(?:DI\s+)?SINISCOLA\b[\s\S]{0,80}?Sede\s+(?:Centrale|Siniscola)/i,
+      end: /LICEO\s+SCIENTIFICO\s+(?:DI\s+)?DORGALI|ISTITUTO\s+TECNICO\s+TRASPORTI|ISTITUTO\s+PROFESSIONALE|IL\s+DIRIGENTE\s+SCOLASTICO/i,
+    },
+  ];
+
+  for (const definition of sectionDefinitions) {
+    const startMatch = normalized.match(definition.start);
+    if (!startMatch || startMatch.index === undefined) continue;
+
+    const sectionStart = startMatch.index;
+    const afterStart = sectionStart + startMatch[0].length;
+    const remainder = normalized.slice(afterStart);
+    const endMatch = remainder.match(definition.end);
+    const sectionEnd = endMatch && endMatch.index !== undefined
+      ? afterStart + endMatch.index
+      : normalized.length;
+
+    const section = normalized.slice(sectionStart, sectionEnd);
+    events.push(...extractPiraScheduleEventsFromSection(section, definition.type));
+  }
+
+  const unique = new Map<string, any>();
+  for (const event of events) {
+    const key = `${event.classe}|${event.data}|${event.oraInizio}|${event.oraFine}`;
+    if (!unique.has(key)) unique.set(key, event);
+  }
+
+  return [...unique.values()];
+}
+
+function ensurePiraScheduleEvents(events: any[], text: string): any[] {
   const result = Array.isArray(events) ? [...events] : [];
-  const extracted = extractIpsasrEventsFromText(text);
+  const extracted = extractPiraScheduleEvents(text);
 
   for (const event of extracted) {
     const exists = result.some((existing) =>
-      normalizePiraClass(existing?.classe || existing?.title) === event.classe &&
-      existing?.data === event.data &&
-      existing?.oraInizio === event.oraInizio &&
-      existing?.oraFine === event.oraFine
+      getPiraCanonicalClass(existing?.classe || existing?.title) === event.classe &&
+      String(existing?.data || "") === event.data &&
+      String(existing?.oraInizio || "") === event.oraInizio &&
+      String(existing?.oraFine || "") === event.oraFine
     );
 
     if (!exists) {
       result.push(event);
       console.log(
-        `🛡️ IPSASR recuperato automaticamente: ${event.classe} ${event.data} ${event.oraInizio}-${event.oraFine}`
+        `🛡️ Evento Pira recuperato automaticamente: ${event.classe} ${event.data} ${event.oraInizio}-${event.oraFine}`
       );
     }
   }
 
   return result;
+}
+
+function extractOrderOfDayFromText(text: string): string[] {
+  const normalized = normalizeScheduleText(text);
+  if (!normalized) return [];
+
+  const marker = normalized.search(/(?:ORDINE\s+DEL\s+GIORNO|ORDINE\s+DEL\s+GIORNO:|O\.D\.G\.?|O\.D\.G\s*:)/i);
+  if (marker < 0) return [];
+
+  let section = normalized.slice(marker);
+  const stop = section.search(/(?:ISTITUTO\s+PROFESSIONALE|LICEO\s+SCIENTIFICO\s+(?:DI\s+)?SINISCOLA|LICEO\s+SCIENTIFICO\s+(?:DI\s+)?DORGALI|CALENDARIO|SECONDO\s+IL\s+CALENDARIO)/i);
+  if (stop > 0) section = section.slice(0, stop);
+
+  const numbered = [...section.matchAll(/(?:^|\s)(\d{1,2})[\.)]\s*(.*?)(?=\s+\d{1,2}[\.)]\s+|$)/g)];
+  const items = numbered
+    .map((match) => String(match[2]).replace(/\s+/g, " ").trim())
+    .filter((item) => item.length > 2);
+
+  return items;
 }
 
 /**
@@ -1664,10 +1808,20 @@ ${text}`,
 
      */
 
-    if (isPira && Array.isArray(parsed.eventi)) {
+    if (isPira) {
+      parsed.eventi = normalizePiraEvents(Array.isArray(parsed.eventi) ? parsed.eventi : []);
+      parsed.eventi = ensurePiraScheduleEvents(parsed.eventi, text);
       parsed.eventi = normalizePiraEvents(parsed.eventi);
-      parsed.eventi = ensurePiraIpsasrEvents(parsed.eventi, text);
-      parsed.eventi = normalizePiraEvents(parsed.eventi);
+
+      if (!Array.isArray(parsed.ordineDelGiorno) || parsed.ordineDelGiorno.length === 0) {
+        const recoveredOrderOfDay = extractOrderOfDayFromText(text);
+        if (recoveredOrderOfDay.length > 0) {
+          parsed.ordineDelGiorno = recoveredOrderOfDay;
+          console.log(
+            `🛡️ Ordine del Giorno recuperato automaticamente: ${recoveredOrderOfDay.length} punti`
+          );
+        }
+      }
     }
 
 
