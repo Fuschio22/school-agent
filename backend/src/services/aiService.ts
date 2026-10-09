@@ -698,22 +698,72 @@ function ensurePiraScheduleEvents(events: any[], text: string): any[] {
 }
 
 function extractOrderOfDayFromText(text: string): string[] {
-  const normalized = normalizeScheduleText(text);
-  if (!normalized) return [];
+  const normalized = normalizeScheduleText(text)
+    .replace(/\u2022/g, "•")
+    .replace(/[\u2018\u2019]/g, "'");
+  if (!normalized.trim()) return [];
 
-  const marker = normalized.search(/(?:ORDINE\s+DEL\s+GIORNO|ORDINE\s+DEL\s+GIORNO:|O\.D\.G\.?|O\.D\.G\s*:)/i);
-  if (marker < 0) return [];
+  // Riconosce sia l'intestazione estesa sia le varianti ODG / O.D.G.
+  const markerRegex = /\bORDINE\s+DEL\s+GIORNO\b\s*:?|\bO\s*\.?\s*D\s*\.?\s*G\s*\.?\s*:?/i;
+  const markerMatch = markerRegex.exec(normalized);
+  if (!markerMatch || markerMatch.index === undefined) return [];
 
-  let section = normalized.slice(marker);
-  const stop = section.search(/(?:ISTITUTO\s+PROFESSIONALE|LICEO\s+SCIENTIFICO\s+(?:DI\s+)?SINISCOLA|LICEO\s+SCIENTIFICO\s+(?:DI\s+)?DORGALI|CALENDARIO|SECONDO\s+IL\s+CALENDARIO)/i);
-  if (stop > 0) section = section.slice(0, stop);
+  let section = normalized.slice(markerMatch.index + markerMatch[0].length);
 
-  const numbered = [...section.matchAll(/(?:^|\s)(\d{1,2})[\.)]\s*(.*?)(?=\s+\d{1,2}[\.)]\s+|$)/g)];
-  const items = numbered
-    .map((match) => String(match[2]).replace(/\s+/g, " ").trim())
+  // L'ODG termina prima delle tabelle del calendario o della firma finale.
+  const stopRegex = /\b(?:ISTITUTO\s+PROFESSIONALE|LICEO\s+SCIENTIFICO\s+(?:DI\s+)?SINISCOLA|LICEO\s+SCIENTIFICO\s+(?:DI\s+)?DORGALI|ISTITUTO\s+TECNICO\s+TRASPORTI|CALENDARIO\s+DEGLI\s+INCONTRI|SECONDO\s+IL\s+CALENDARIO|IL\s+DIRIGENTE\s+SCOLASTICO)\b/i;
+  const stopMatch = stopRegex.exec(section);
+  if (stopMatch && stopMatch.index > 0) section = section.slice(0, stopMatch.index);
+
+  section = section
+    .replace(/\r/g, "\n")
+    .replace(/[\t ]+/g, " ")
+    .replace(/\n[ \t]+/g, "\n")
+    .trim();
+  if (!section) return [];
+
+  // Primo tentativo: elenco numerato, sia su più righe sia tutto su una riga.
+  const itemStarts = [...section.matchAll(/(?:^|\s)(\d{1,2})\s*[.)]\s+/g)];
+  const numberedItems: string[] = [];
+
+  for (let i = 0; i < itemStarts.length; i++) {
+    const match = itemStarts[i];
+    const markerEnd = (match.index ?? 0) + match[0].length;
+    const nextStart = i + 1 < itemStarts.length
+      ? (itemStarts[i + 1].index ?? section.length)
+      : section.length;
+    const item = section
+      .slice(markerEnd, nextStart)
+      .replace(/^\s+|\s+$/g, "")
+      .replace(/[\n\r]+/g, " ")
+      .replace(/\s{2,}/g, " ")
+      .replace(/[;,.\s]+$/g, "")
+      .trim();
+
+    if (item.length > 2) numberedItems.push(item);
+  }
+
+  if (numberedItems.length > 0) {
+    return [...new Set(numberedItems)];
+  }
+
+  // Fallback: elenchi con pallini o trattini, comuni nei testi estratti dai PDF.
+  const bulletItems = section
+    .split(/\n+/)
+    .map((line) => line.trim())
+    .filter((line) => /^[•●▪◦*-]\s+/.test(line))
+    .map((line) => line.replace(/^[•●▪◦*-]\s+/, "").replace(/[;,.\s]+$/g, "").trim())
     .filter((item) => item.length > 2);
 
-  return items;
+  if (bulletItems.length > 0) return [...new Set(bulletItems)];
+
+  // Ultimo fallback per PDF che appiattiscono ogni punto su una riga senza numerazione.
+  return [...new Set(
+    section
+      .split(/\n+/)
+      .map((line) => line.trim())
+      .filter((line) => line.length > 8 && !/^\d{1,2}[.)]?$/.test(line))
+  )];
 }
 
 /**
