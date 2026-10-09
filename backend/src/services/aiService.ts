@@ -615,23 +615,39 @@ function extractPiraScheduleEvents(text: string): any[] {
 }
 
 function ensurePiraScheduleEvents(events: any[], text: string): any[] {
-  const result = Array.isArray(events) ? [...events] : [];
+  const original = Array.isArray(events) ? [...events] : [];
   const extracted = extractPiraScheduleEvents(text);
+  if (!extracted.length) return original;
 
+  // Il calendario scritto nella circolare è la fonte autorevole per questi
+  // Consigli di Classe: se Groq ha associato un orario errato alla stessa
+  // classe e data, sostituiamo l'evento AI invece di aggiungerne un duplicato.
+  const scheduleKeys = new Set(
+    extracted.map((event) => `${event.classe}|${canonicalizeScheduleDate(String(event.data || ""))}`)
+  );
+
+  const result = original.filter((existing) => {
+    const existingType = String(existing?.type || "").toLowerCase();
+    const existingTitle = String(existing?.title || "").toLowerCase();
+    const isClassCouncil = existingType.includes("consigli di classe") ||
+      existingType.includes("consiglio di classe") ||
+      existingTitle.includes("consiglio di classe");
+    if (!isClassCouncil) return true;
+
+    const canonicalClass = getPiraCanonicalClass(existing?.classe || existing?.title);
+    const canonicalDate = canonicalizeScheduleDate(String(existing?.data || ""));
+    return !scheduleKeys.has(`${canonicalClass}|${canonicalDate}`);
+  });
+
+  const addedKeys = new Set<string>();
   for (const event of extracted) {
-    const exists = result.some((existing) =>
-      getPiraCanonicalClass(existing?.classe || existing?.title) === event.classe &&
-      String(existing?.data || "") === event.data &&
-      String(existing?.oraInizio || "") === event.oraInizio &&
-      String(existing?.oraFine || "") === event.oraFine
+    const key = `${event.classe}|${event.data}|${event.oraInizio}|${event.oraFine}`;
+    if (addedKeys.has(key)) continue;
+    addedKeys.add(key);
+    result.push(event);
+    console.log(
+      `🛡️ Calendario della circolare applicato: ${event.classe} ${event.data} ${event.oraInizio}-${event.oraFine}`
     );
-
-    if (!exists) {
-      result.push(event);
-      console.log(
-        `🛡️ Evento Pira recuperato automaticamente: ${event.classe} ${event.data} ${event.oraInizio}-${event.oraFine}`
-      );
-    }
   }
 
   return result;
@@ -695,109 +711,59 @@ function extractOrderOfDayFromText(text: string): string[] {
  * testuale della classe, nel DB finirà con il codice canonico.
  */
 function normalizePiraEvents(events: any[]): any[] {
+  if (!Array.isArray(events)) return [];
 
-  if (!Array.isArray(events)) {
-
-    return [];
-
-  }
-
-
-
-  return events.map((event) => {
-
-    const normalizedEvent = {
-
-      ...event,
-
-    };
-
-
-
-    const classFromField = extractPiraClassFromText(
-
-      event?.classe
-
-    );
-
-
-
-    const classFromTitle = extractPiraClassFromText(
-
-      event?.title
-
-    );
-
-
-
-    const canonicalClass =
-
-      classFromField ||
-
-      classFromTitle ||
-
-      normalizePiraClass(event?.classe);
-
-
+  const normalizedEvents = events.map((event) => {
+    const normalizedEvent = { ...event };
+    const classFromField = extractPiraClassFromText(event?.classe);
+    const classFromTitle = extractPiraClassFromText(event?.title);
+    const canonicalClass = classFromField || classFromTitle || normalizePiraClass(event?.classe);
 
     if (canonicalClass) {
-
       normalizedEvent.classe = canonicalClass;
-
-
-
-      /*
-
-       * Per i Consigli di Classe rendiamo il titolo
-
-       * coerente con la classe normalizzata.
-
-       */
-
       const type = String(event?.type || "").toLowerCase();
-
-
-
-      if (
-
-        type.includes("consiglio di classe") ||
-
-        type.includes("consigli di classe")
-
-      ) {
-
-        normalizedEvent.title =
-
-          `Consiglio di Classe ${canonicalClass}`;
-
+      if (type.includes("consiglio di classe") || type.includes("consigli di classe")) {
+        normalizedEvent.title = `Consiglio di Classe ${canonicalClass}`;
       }
-
-
-
-      if (
-
-        type.includes("glo") ||
-
-        type.includes("gruppi di lavoro operativi")
-
-      ) {
-
-        normalizedEvent.title =
-
-          `GLO ${canonicalClass}`;
-
+      if (type.includes("glo") || type.includes("gruppi di lavoro operativi")) {
+        normalizedEvent.title = `GLO ${canonicalClass}`;
       }
-
     }
 
-
-
+    // Uniforma data e orari prima del confronto: 15.00 e 15:00
+    // devono rappresentare lo stesso orario ai fini della deduplicazione.
+    if (normalizedEvent.data) {
+      normalizedEvent.data = canonicalizeScheduleDate(String(normalizedEvent.data));
+    }
+    if (normalizedEvent.oraInizio) {
+      normalizedEvent.oraInizio = canonicalizeScheduleTime(String(normalizedEvent.oraInizio));
+    }
+    if (normalizedEvent.oraFine) {
+      normalizedEvent.oraFine = canonicalizeScheduleTime(String(normalizedEvent.oraFine));
+    }
     return normalizedEvent;
-
   });
 
-}
+  // Deduplica gli eventi AI e quelli recuperati dal testo usando classe,
+  // data e intervallo orario normalizzati. Non elimina incontri diversi.
+  const unique = new Map<string, any>();
+  for (const event of normalizedEvents) {
+    const canonicalClass = getPiraCanonicalClass(event?.classe || event?.title);
+    const date = String(event?.data || "").trim();
+    const start = String(event?.oraInizio || "").trim();
+    const end = String(event?.oraFine || "").trim();
+    const key = canonicalClass && date && start && end
+      ? `${canonicalClass}|${date}|${start}|${end}`
+      : `unkeyed|${unique.size}`;
+    if (!unique.has(key)) unique.set(key, event);
+  }
 
+  const removed = normalizedEvents.length - unique.size;
+  if (removed > 0) {
+    console.log(`🧹 Duplicati eventi Pira rimossi: ${removed}`);
+  }
+  return [...unique.values()];
+}
 
 
 export async function analyzeCircularText(
