@@ -527,39 +527,12 @@ function extractPiraScheduleEventsFromSection(
   const section = normalizeScheduleText(sectionText);
   const dates = extractPiraDateMatches(section);
   const events: any[] = [];
-
-  const classPattern = sectionType === "liceo"
-    ? "([1-5])\\s*\\^?\\s*([AB])\\s+(?:LICEO\\s+SCIENTIFICO(?:\\s+DI)?(?:\\s+SINISCOLA)?|LICEO\\s+SINISCOLA)\\b"
-    : "([45])\\s*\\^?\\s*(A)\\s+IPSASR\\b";
-
-  const timeRegex = /(\d{1,2}[\.:]\d{2})\s*-\s*(\d{1,2}[\.:]\d{2})/g;
-  const classRegex = new RegExp(classPattern, "gi");
-
-  const addEvent = (
-    date: string,
-    startTime: string,
-    endTime: string,
-    classNumber: string,
-    classLetter: string
-  ) => {
-    const canonicalClass = sectionType === "liceo"
-      ? `${classNumber}${classLetter.toUpperCase()}S`
-      : `${classNumber}A IPSASR`;
-
-    if (sectionType === "ipsasr" && canonicalClass !== "4A IPSASR" && canonicalClass !== "5A IPSASR") {
-      return;
-    }
-
-    events.push({
-      title: `Consiglio di Classe ${canonicalClass}`,
-      type: "Consigli di Classe",
-      sede: sectionType === "ipsasr" ? "Sede Agrario" : "Sede Centrale",
-      data: canonicalizeScheduleDate(date),
-      oraInizio: canonicalizeScheduleTime(startTime),
-      oraFine: canonicalizeScheduleTime(endTime),
-      classe: canonicalClass,
-    });
-  };
+  const classRegex = sectionType === "liceo"
+    ? /([1-5])\s*\^?\s*([AB])\s+(?:LICEO\s+SCIENTIFICO(?:\s+DI)?(?:\s+SINISCOLA)?|LICEO\s+SINISCOLA)\b/gi
+    : /([1-5])\s*\^?\s*([AB])\s+IPSASR\b/gi;
+  // Nei PDF gli intervalli possono comparire come "15.00 15.45", "15:00-15:45"
+  // oppure con trattino lungo/spazi. Non richiediamo quindi un trattino.
+  const timeRegex = /\b(\d{1,2}[.:]\d{2})\s*(?:-|\s)\s*(\d{1,2}[.:]\d{2})\b/g;
 
   for (let i = 0; i < dates.length; i++) {
     const current = dates[i];
@@ -567,53 +540,32 @@ function extractPiraScheduleEventsFromSection(
     const blockStart = current.index + current.value.length;
     const blockEnd = next ? next.index : section.length;
     const block = section.slice(blockStart, blockEnd);
-
     const classMatches = [...block.matchAll(classRegex)];
     const timeMatches = [...block.matchAll(timeRegex)];
 
-    for (const classMatch of classMatches) {
-      const groups = classMatch.slice(1);
-      const classNumber = groups[0];
-      const classLetter = groups[1];
-      const classStart = classMatch.index ?? 0;
-      const classEnd = classStart + classMatch[0].length;
+    // Nelle tabelle di questa circolare gli orari e le classi sono in ordine
+    // cronologico. L'associazione per posizione evita di assegnare a una classe
+    // l'orario della riga precedente quando l'OCR appiattisce la tabella.
+    const count = Math.min(classMatches.length, timeMatches.length);
+    for (let j = 0; j < count; j++) {
+      const classMatch = classMatches[j];
+      const timeMatch = timeMatches[j];
+      const classNumber = classMatch[1];
+      const classLetter = classMatch[2].toUpperCase();
+      const canonicalClass = sectionType === "liceo"
+        ? `${classNumber}${classLetter}S`
+        : `${classNumber}${classLetter} IPSASR`;
+      if (sectionType === "ipsasr" && canonicalClass !== "4A IPSASR" && canonicalClass !== "5A IPSASR") continue;
 
-      const previousTimes = timeMatches.filter((timeMatch) =>
-        (timeMatch.index ?? 0) + timeMatch[0].length <= classStart
-      );
-      const nextTimes = timeMatches.filter((timeMatch) =>
-        (timeMatch.index ?? 0) >= classEnd
-      );
-
-      const previous = previousTimes.length > 0
-        ? previousTimes[previousTimes.length - 1]
-        : undefined;
-      const following = nextTimes.length > 0
-        ? nextTimes[0]
-        : undefined;
-
-      let selected = previous;
-      if (following) {
-        const previousDistance = previous
-          ? classStart - ((previous.index ?? 0) + previous[0].length)
-          : Number.POSITIVE_INFINITY;
-        const followingDistance = (following.index ?? 0) - classEnd;
-
-        if (followingDistance < previousDistance) {
-          selected = following;
-        }
-      }
-
-      if (!selected) continue;
-
-      const timeGroups = selected.slice(1);
-      addEvent(
-        current.value,
-        timeGroups[0],
-        timeGroups[1],
-        classNumber,
-        classLetter
-      );
+      events.push({
+        title: `Consiglio di Classe ${canonicalClass}`,
+        type: "Consigli di Classe",
+        sede: sectionType === "ipsasr" ? "Sede Agrario" : "Sede Centrale",
+        data: canonicalizeScheduleDate(current.value),
+        oraInizio: canonicalizeScheduleTime(timeMatch[1]),
+        oraFine: canonicalizeScheduleTime(timeMatch[2]),
+        classe: canonicalClass,
+      });
     }
   }
 
@@ -622,47 +574,36 @@ function extractPiraScheduleEventsFromSection(
     const key = `${event.classe}|${event.data}|${event.oraInizio}|${event.oraFine}`;
     if (!unique.has(key)) unique.set(key, event);
   }
-
   return [...unique.values()];
 }
 
 function extractPiraScheduleEvents(text: string): any[] {
   const normalized = normalizeScheduleText(text);
   if (!normalized) return [];
-
   const events: any[] = [];
 
-  const sectionDefinitions: Array<{
-    type: "liceo" | "ipsasr";
-    start: RegExp;
-    end: RegExp;
-  }> = [
+  const sectionDefinitions: Array<{ type: "liceo" | "ipsasr"; start: RegExp; end: RegExp }> = [
     {
       type: "ipsasr",
-      start: /ISTITUTO\s+PROFESSIONALE(?:\s+PER\s+L[’']AGRICOLTURA)?(?:\s+E\s+LO\s+SVILUPPO\s+RURALE|\s+SERVIZI\s+AGRICOLTURA\s+SVILUPPO\s+RURALE)[\s\S]*?Sede\s+(?:Centrale|Agrario)/i,
-      end: /LICEO\s+SCIENTIFICO\s+DI?\s+SINISCOLA|LICEO\s+SCIENTIFICO\s+SINISCOLA|LICEO\s+SCIENTIFICO\s+DI?\s+DORGALI|ISTITUTO\s+TECNICO\s+TRASPORTI|ISTITUTO\s+PROFESSIONALE|IL\s+DIRIGENTE\s+SCOLASTICO/i,
+      start: /ISTITUTO\s+PROFESSIONALE[\s\S]{0,220}?SEDE\s+AGRARIO/i,
+      end: /LICEO\s+SCIENTIFICO\s+(?:DI\s+)?SINISCOLA|LICEO\s+SCIENTIFICO\s+(?:DI\s+)?DORGALI|ISTITUTO\s+TECNICO\s+TRASPORTI|IL\s+DIRIGENTE\s+SCOLASTICO/i,
     },
     {
       type: "liceo",
-      start: /LICEO\s+SCIENTIFICO\s+(?:DI\s+)?SINISCOLA\b[\s\S]{0,80}?Sede\s+(?:Centrale|Siniscola)/i,
-      end: /LICEO\s+SCIENTIFICO\s+(?:DI\s+)?DORGALI|ISTITUTO\s+TECNICO\s+TRASPORTI|ISTITUTO\s+PROFESSIONALE|IL\s+DIRIGENTE\s+SCOLASTICO/i,
+      start: /LICEO\s+SCIENTIFICO\s+(?:DI\s+)?SINISCOLA\b[\s\S]{0,120}?SEDE\s+(?:CENTRALE|SINISCOLA)/i,
+      end: /LICEO\s+SCIENTIFICO\s+(?:DI\s+)?DORGALI|ISTITUTO\s+TECNICO\s+TRASPORTI|IL\s+DIRIGENTE\s+SCOLASTICO/i,
     },
   ];
 
   for (const definition of sectionDefinitions) {
     const startMatch = normalized.match(definition.start);
     if (!startMatch || startMatch.index === undefined) continue;
-
     const sectionStart = startMatch.index;
     const afterStart = sectionStart + startMatch[0].length;
     const remainder = normalized.slice(afterStart);
     const endMatch = remainder.match(definition.end);
-    const sectionEnd = endMatch && endMatch.index !== undefined
-      ? afterStart + endMatch.index
-      : normalized.length;
-
-    const section = normalized.slice(sectionStart, sectionEnd);
-    events.push(...extractPiraScheduleEventsFromSection(section, definition.type));
+    const sectionEnd = endMatch && endMatch.index !== undefined ? afterStart + endMatch.index : normalized.length;
+    events.push(...extractPiraScheduleEventsFromSection(normalized.slice(sectionStart, sectionEnd), definition.type));
   }
 
   const unique = new Map<string, any>();
@@ -670,7 +611,6 @@ function extractPiraScheduleEvents(text: string): any[] {
     const key = `${event.classe}|${event.data}|${event.oraInizio}|${event.oraFine}`;
     if (!unique.has(key)) unique.set(key, event);
   }
-
   return [...unique.values()];
 }
 
@@ -699,71 +639,53 @@ function ensurePiraScheduleEvents(events: any[], text: string): any[] {
 
 function extractOrderOfDayFromText(text: string): string[] {
   const normalized = normalizeScheduleText(text)
-    .replace(/\u2022/g, "•")
-    .replace(/[\u2018\u2019]/g, "'");
+    .replace(/[\u2018\u2019]/g, "'")
+    .replace(/\u2022/g, "•");
   if (!normalized.trim()) return [];
 
-  // Riconosce sia l'intestazione estesa sia le varianti ODG / O.D.G.
-  const markerRegex = /\bORDINE\s+DEL\s+GIORNO\b\s*:?|\bO\s*\.?\s*D\s*\.?\s*G\s*\.?\s*:?/i;
+  // La dicitura reale della circolare è "punti all'o.d.g, secondo il calendario";
+  // accettiamo anche le varianti con punti/spazi e senza intestazione estesa.
+  const markerRegex = /(?:ORDINE\s+DEL\s+GIORNO|O\s*\.?\s*D\s*\.?\s*G\s*\.?|PUNTI\s+ALL['’]?\s*O\s*\.?\s*D\s*\.?\s*G\s*\.?)/i;
   const markerMatch = markerRegex.exec(normalized);
-  if (!markerMatch || markerMatch.index === undefined) return [];
+  let startIndex = markerMatch && markerMatch.index !== undefined
+    ? markerMatch.index + markerMatch[0].length
+    : -1;
+  if (startIndex < 0) {
+    const pointsPhrase = /punti\s+all['’]?\s*o\s*\.?\s*d\s*\.?\s*g/i.exec(normalized);
+    if (!pointsPhrase || pointsPhrase.index === undefined) return [];
+    startIndex = pointsPhrase.index + pointsPhrase[0].length;
+  }
 
-  let section = normalized.slice(markerMatch.index + markerMatch[0].length);
-
-  // L'ODG termina prima delle tabelle del calendario o della firma finale.
-  const stopRegex = /\b(?:ISTITUTO\s+PROFESSIONALE|LICEO\s+SCIENTIFICO\s+(?:DI\s+)?SINISCOLA|LICEO\s+SCIENTIFICO\s+(?:DI\s+)?DORGALI|ISTITUTO\s+TECNICO\s+TRASPORTI|CALENDARIO\s+DEGLI\s+INCONTRI|SECONDO\s+IL\s+CALENDARIO|IL\s+DIRIGENTE\s+SCOLASTICO)\b/i;
+  let section = normalized.slice(startIndex);
+  const stopRegex = /\b(?:ISTITUTO\s+PROFESSIONALE|LICEO\s+SCIENTIFICO\s+(?:DI\s+)?SINISCOLA|LICEO\s+SCIENTIFICO\s+(?:DI\s+)?DORGALI|ISTITUTO\s+TECNICO\s+TRASPORTI|SEDE\s+AGRARIO|IL\s+DIRIGENTE\s+SCOLASTICO)\b/i;
   const stopMatch = stopRegex.exec(section);
   if (stopMatch && stopMatch.index > 0) section = section.slice(0, stopMatch.index);
+  section = section.trim();
 
-  section = section
-    .replace(/\r/g, "\n")
-    .replace(/[\t ]+/g, " ")
-    .replace(/\n[ \t]+/g, "\n")
-    .trim();
-  if (!section) return [];
-
-  // Primo tentativo: elenco numerato, sia su più righe sia tutto su una riga.
-  const itemStarts = [...section.matchAll(/(?:^|\s)(\d{1,2})\s*[.)]\s+/g)];
-  const numberedItems: string[] = [];
-
-  for (let i = 0; i < itemStarts.length; i++) {
-    const match = itemStarts[i];
-    const markerEnd = (match.index ?? 0) + match[0].length;
-    const nextStart = i + 1 < itemStarts.length
-      ? (itemStarts[i + 1].index ?? section.length)
-      : section.length;
-    const item = section
-      .slice(markerEnd, nextStart)
-      .replace(/^\s+|\s+$/g, "")
-      .replace(/[\n\r]+/g, " ")
-      .replace(/\s{2,}/g, " ")
-      .replace(/[;,.\s]+$/g, "")
+  // Numerazione da 1 a 11: il lookahead evita di perdere il numero successivo.
+  const starts = [...section.matchAll(/(?:^|\s)(\d{1,2})\s*[.)]\s+/g)];
+  const numbered: string[] = [];
+  for (let i = 0; i < starts.length; i++) {
+    const match = starts[i];
+    const number = Number(match[1]);
+    if (number < 1 || number > 30) continue;
+    const itemStart = (match.index ?? 0) + match[0].length;
+    const next = starts[i + 1];
+    const itemEnd = next ? (next.index ?? section.length) : section.length;
+    const item = section.slice(itemStart, itemEnd)
+      .replace(/[\r\n]+/g, " ")
+      .replace(/\s+/g, " ")
+      .replace(/^[\s;,:-]+|[\s;,:-]+$/g, "")
       .trim();
-
-    if (item.length > 2) numberedItems.push(item);
+    if (item.length > 3) numbered.push(item);
   }
+  if (numbered.length) return [...new Set(numbered)];
 
-  if (numberedItems.length > 0) {
-    return [...new Set(numberedItems)];
-  }
-
-  // Fallback: elenchi con pallini o trattini, comuni nei testi estratti dai PDF.
-  const bulletItems = section
-    .split(/\n+/)
-    .map((line) => line.trim())
-    .filter((line) => /^[•●▪◦*-]\s+/.test(line))
-    .map((line) => line.replace(/^[•●▪◦*-]\s+/, "").replace(/[;,.\s]+$/g, "").trim())
-    .filter((item) => item.length > 2);
-
-  if (bulletItems.length > 0) return [...new Set(bulletItems)];
-
-  // Ultimo fallback per PDF che appiattiscono ogni punto su una riga senza numerazione.
-  return [...new Set(
-    section
-      .split(/\n+/)
-      .map((line) => line.trim())
-      .filter((line) => line.length > 8 && !/^\d{1,2}[.)]?$/.test(line))
-  )];
+  const bullets = section.split(/\n+/).map(line => line.trim())
+    .filter(line => /^[•●▪◦*-]\s+/.test(line))
+    .map(line => line.replace(/^[•●▪◦*-]\s+/, "").replace(/[;,.\s]+$/g, "").trim())
+    .filter(item => item.length > 3);
+  return [...new Set(bullets)];
 }
 
 /**
@@ -1114,7 +1036,9 @@ export async function analyzeCircularText(
 
 
 
-  const response = await openai.chat.completions.create({
+  let response: any;
+  try {
+    response = await openai.chat.completions.create({
 
     model: "openai/gpt-oss-120b",
 
@@ -1792,9 +1716,31 @@ ${text}`,
 
     },
 
-  });
+    });
+  } catch (error) {
+    console.error("❌ Errore AI durante l'analisi della circolare:", error);
+    if (!isPira) throw error;
 
-
+    // Fallback deterministico per IIS Pira: se Groq esaurisce i token o
+    // restituisce un errore JSON, salva comunque gli eventi e l'ODG ricavati
+    // direttamente dal testo originale, senza inventare dati.
+    const fallbackEvents = normalizePiraEvents(ensurePiraScheduleEvents([], text));
+    const fallbackOrder = extractOrderOfDayFromText(text);
+    const numberMatch = text.match(/circolare\s+n(?:\.|°|º)?\s*(\d+)/i);
+    const dateMatch = text.match(/(?:Siniscola\s*,?\s*)?(\d{1,2}\s+[a-zàèéìòù]+\s+\d{4})/i);
+    const subjectMatch = text.match(/OGGETTO\s*:\s*([^\n\r]+)/i);
+    return {
+      circolare: {
+        numero: numberMatch?.[1] || "N/D",
+        data: dateMatch?.[1] || "",
+        oggetto: subjectMatch?.[1]?.trim() || "Circolare scolastica",
+        destinatari: [],
+      },
+      eventi: fallbackEvents,
+      ordineDelGiorno: fallbackOrder,
+      scuola: "IIS Pira",
+    };
+  }
 
   const content =
 
@@ -1863,14 +1809,14 @@ ${text}`,
       parsed.eventi = ensurePiraScheduleEvents(parsed.eventi, text);
       parsed.eventi = normalizePiraEvents(parsed.eventi);
 
-      if (!Array.isArray(parsed.ordineDelGiorno) || parsed.ordineDelGiorno.length === 0) {
-        const recoveredOrderOfDay = extractOrderOfDayFromText(text);
-        if (recoveredOrderOfDay.length > 0) {
-          parsed.ordineDelGiorno = recoveredOrderOfDay;
-          console.log(
-            `🛡️ Ordine del Giorno recuperato automaticamente: ${recoveredOrderOfDay.length} punti`
-          );
-        }
+      const recoveredOrderOfDay = extractOrderOfDayFromText(text);
+      if (recoveredOrderOfDay.length > 0) {
+        // Per le circolari Pira il testo originale prevale sulla lista AI,
+        // che può essere vuota o troncata dal limite di token.
+        parsed.ordineDelGiorno = recoveredOrderOfDay;
+        console.log(
+          `🛡️ Ordine del Giorno verificato dal testo: ${recoveredOrderOfDay.length} punti`
+        );
       }
     }
 
